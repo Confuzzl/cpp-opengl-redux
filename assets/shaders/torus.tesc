@@ -1,4 +1,4 @@
-#version 450 core
+#version 460 core
 
 layout (vertices = 1) out;
 

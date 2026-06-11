@@ -1,9 +1,9 @@
 #include "app/app.h"
 
+#include <GLFW/glfw3.h>
 #include <fmt/color.h>
 #include <fmt/format.h>
 #include <glad/gl.h>
-#include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
@@ -14,13 +14,6 @@
 #include "callback.h"
 #include "util.h"
 
-template <int I> static constexpr std::pair<int, Key> sceneChangeCallback() {
-  return {GLFW_KEY_0 + I, Key{Key::JUST, [](const float) {
-                                app().activeScene->input.reset();
-                                app().activeScene = app().scenes[I - 1].get();
-                              }}};
-}
-
 static bool lockCursor = true;
 
 Initializer::Initializer()
@@ -28,14 +21,6 @@ Initializer::Initializer()
           {
               {GLFW_KEY_ESCAPE,
                Key{Key::JUST, [](const float) { app().close(); }}},
-              // sceneChangeCallback<1>(),
-              // sceneChangeCallback<2>(),
-              // sceneChangeCallback<3>(),
-              // sceneChangeCallback<4>(),
-              // sceneChangeCallback<5>(),
-              // sceneChangeCallback<6>(),
-              // sceneChangeCallback<7>(),
-              // sceneChangeCallback<8>(),
               {GLFW_KEY_TAB,
                Key{
                    Key::JUST,
@@ -47,47 +32,32 @@ Initializer::Initializer()
                    },
                }},
           },
-          [](GLFWwindow *window, int button, int action, int mods) {
-            (void)window, button, action, mods;
-          },
-          [](GLFWwindow *window, double xoffset, double yoffset) {
-            (void)window, xoffset, yoffset;
-          },
-          [](GLFWwindow *window, double xpos, double ypos) {
-            (void)window, xpos, ypos;
-          },
+          []([[maybe_unused]] GLFWwindow *window, [[maybe_unused]] int button,
+             [[maybe_unused]] int action, [[maybe_unused]] int mods) {},
+          []([[maybe_unused]] GLFWwindow *window,
+             [[maybe_unused]] double xoffset,
+             [[maybe_unused]] double yoffset) {},
+          []([[maybe_unused]] GLFWwindow *window, [[maybe_unused]] double xpos,
+             [[maybe_unused]] double ypos) {},
       },
       projection{} {
-  if (!glfwInit()) {
+  if (!glfwInit())
     throw std::runtime_error{"GLFW FAILED TO INIT"};
-  }
 
   glfwSetErrorCallback(callback::error);
 
   glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-  glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 5);
+  glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
   // glfwWindowHint(GLFW_MAXIMIZED, true);
   glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, true);
   window = glfwCreateWindow(DEFAULT_DIMENSIONS.x, DEFAULT_DIMENSIONS.y,
                             "Template", nullptr, nullptr);
-  if (!window) {
+  if (!window)
     throw std::runtime_error{"GLFW FAILED TO CREATE WINDOW"};
-  }
-  // float main_scale =
-  //     ImGui_ImplGlfw_GetContentScaleForMonitor(glfwGetPrimaryMonitor());
-
-  // fmt::println("scale = {}", main_scale);
-
-  // glm::vec2 scale;
-  // glfwGetMonitorContentScale(glfwGetPrimaryMonitor(), &scale.x, &scale.y);
-  // fmt::println("scale2 = ({},{})", scale.x, scale.y);
 
   glfwGetFramebufferSize(window, &framebufferSize.x, &framebufferSize.y);
   glfwGetWindowSize(window, &windowSize.x, &windowSize.y);
-
-  // fmt::println("fb=({},{}) ws=({},{})", framebufferSize.x, framebufferSize.y,
-  //              windowSize.x, windowSize.y);
 
   const auto xScale = static_cast<float>(framebufferSize.x) / windowSize.x,
              yScale = static_cast<float>(framebufferSize.y) / windowSize.y;
@@ -153,7 +123,7 @@ Initializer::Initializer()
   // ImGuiIO &io = ImGui::GetIO();
   // io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
   ImGui_ImplGlfw_InitForOpenGL(window, true);
-  ImGui_ImplOpenGL3_Init("#version 450");
+  ImGui_ImplOpenGL3_Init("#version 460");
   ImGui::StyleColorsDark();
 
   glPointSize(10.0f);
@@ -170,9 +140,9 @@ Initializer::~Initializer() {
 
 App::App()
     : scenes{
-         std::make_unique<scene::Scene>(),
-      }, activeScene{scenes[0].get()} {
-}
+          std::make_unique<scene::Scene>(),
+      },
+      activeScene{scenes[0].get()} {}
 void App::run() {
   glfwMaximizeWindow(window);
 

@@ -83,6 +83,11 @@ constexpr auto pow(const int a, const int n) {
 namespace GL {
 std::string_view getErrorName();
 
+constexpr glm::u16vec2 uv_as_short(const glm::vec2 uv) {
+  constexpr GLushort MAX = -1;
+  return glm::u16vec2{uv.x * MAX, uv.y * MAX};
+}
+
 namespace detail {
 struct gen_2_10_10_10_rev {
   unsigned int storage = 0;
@@ -94,6 +99,9 @@ struct gen_2_10_10_10_rev {
                 ((z & 0b11'1111'1111) << 20) | ((w & 0b11) << 30)} {}
 };
 } // namespace detail
+
+struct half_float {};
+struct fixed {};
 
 struct int_2_10_10_10_rev : detail::gen_2_10_10_10_rev {
   using gen_2_10_10_10_rev::gen_2_10_10_10_rev;
@@ -114,50 +122,24 @@ struct uint_2_10_10_10_rev : detail::gen_2_10_10_10_rev {
     return {x, y, z};
   }
 };
-struct uint_10_11_11_rev {
-  unsigned int storage = 0;
+struct uint_10_11_11_rev {};
 
-  constexpr uint_10_11_11_rev() = default;
-  constexpr uint_10_11_11_rev(const unsigned int x, const unsigned int y,
-                              const unsigned int z = 0)
-      : /*x{x}, y{y}, z{z}*/ storage{(x & 0b111'1111'1111) |
-                                     ((y & 0b111'1111'1111) << 11) |
-                                     ((z & 0b11'1111'1111) << 22)} {}
-
-  constexpr static uint_10_11_11_rev from_uvw(const glm::vec3 v) {
-    constexpr float MAX_11 = (1 << 11) - 1, MAX_10 = (1 << 10) - 1;
-    constexpr glm::vec3 MAX{MAX_11, MAX_11, MAX_10};
-    const auto [x, y, z] = static_cast<glm::uvec3>(v * MAX);
-    return {x, y, z};
-  }
-  constexpr static uint_10_11_11_rev from_uv(const glm::vec2 v) {
-    return from_uvw({v, 0});
-  }
-
-  constexpr operator glm::vec3() const {
-    constexpr float MAX_11 = (1 << 11) - 1, MAX_10 = (1 << 10) - 1;
-    const unsigned int x = storage & 0b111'1111'1111,
-                       y = (storage >> 11) & 0b111'1111'1111,
-                       z = (storage >> 22) & 0b11'1111'1111;
-    return {x / MAX_11, y / MAX_11, z / MAX_10};
-  }
-};
-
-template <typename T> constexpr GLenum macroOf;
-template <> constexpr GLenum macroOf<GLbyte> = GL_BYTE;
-template <> constexpr GLenum macroOf<GLubyte> = GL_UNSIGNED_BYTE;
-template <> constexpr GLenum macroOf<GLshort> = GL_SHORT;
-template <> constexpr GLenum macroOf<GLushort> = GL_UNSIGNED_SHORT;
-template <> constexpr GLenum macroOf<GLint> = GL_INT;
-template <> constexpr GLenum macroOf<GLuint> = GL_UNSIGNED_INT;
-template <> constexpr GLenum macroOf<GLfloat> = GL_FLOAT;
-template <> constexpr GLenum macroOf<GLdouble> = GL_DOUBLE;
-
+template <typename T> GLenum macroOf;
+template <> inline constexpr GLenum macroOf<GLbyte> = GL_BYTE;
+template <> inline constexpr GLenum macroOf<GLubyte> = GL_UNSIGNED_BYTE;
+template <> inline constexpr GLenum macroOf<GLshort> = GL_SHORT;
+template <> inline constexpr GLenum macroOf<GLushort> = GL_UNSIGNED_SHORT;
+template <> inline constexpr GLenum macroOf<GLint> = GL_INT;
+template <> inline constexpr GLenum macroOf<GLuint> = GL_UNSIGNED_INT;
+template <> inline constexpr GLenum macroOf<GLfloat> = GL_FLOAT;
+template <> inline constexpr GLenum macroOf<GLdouble> = GL_DOUBLE;
 template <>
-constexpr GLenum macroOf<int_2_10_10_10_rev> = GL_INT_2_10_10_10_REV;
+inline constexpr GLenum macroOf<int_2_10_10_10_rev> = GL_INT_2_10_10_10_REV;
 template <>
-constexpr GLenum macroOf<uint_2_10_10_10_rev> = GL_UNSIGNED_INT_2_10_10_10_REV;
+inline constexpr GLenum macroOf<uint_2_10_10_10_rev> =
+    GL_UNSIGNED_INT_2_10_10_10_REV;
 template <>
-constexpr GLenum macroOf<uint_10_11_11_rev> = GL_UNSIGNED_INT_10F_11F_11F_REV;
+inline constexpr GLenum macroOf<uint_10_11_11_rev> =
+    GL_UNSIGNED_INT_10F_11F_11F_REV;
 
 } // namespace GL

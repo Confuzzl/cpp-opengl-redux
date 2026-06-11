@@ -17,9 +17,9 @@ struct Initializer {
   glm::ivec2 framebufferSize;
   glm::ivec2 windowSize;
 
-  glm::mat4 projection;
-
   InputHandler input;
+
+  glm::mat4 projection;
 
   Initializer();
   ~Initializer();
@@ -31,6 +31,7 @@ struct App : Initializer {
     shaders::Flat flat;
     shaders::Normal normal;
     shaders::Phong phong;
+    shaders::Phong2 phong2;
     shaders::Sphere sphere;
     shaders::Cylinder cylinder;
     shaders::Cone cone;

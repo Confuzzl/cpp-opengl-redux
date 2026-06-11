@@ -12,9 +12,7 @@
 
 namespace shaders::vertex_layout {
 namespace detail {
-template <typename... Ts> struct type_list {
-  // static constexpr auto SIZE = sizeof...(Ts);
-};
+template <typename... Ts> struct type_list {};
 
 template <typename List, std::size_t I> struct subscript {};
 template <typename Head, typename... Tail>
@@ -36,88 +34,83 @@ struct contains<Target, type_list<Head, Tail...>> {
   static constexpr bool value =
       std::same_as<Target, Head> || contains<Target, type_list<Tail...>>::value;
 };
+template <typename Target, typename List>
+inline constexpr bool contains_v = contains<Target, List>::value;
 
-template <typename T> struct Underlying {
+template <typename T> struct FormatData {
   using Type = T;
   static constexpr auto length = 1;
 };
-template <glm::length_t L, typename T> struct Underlying<glm::vec<L, T>> {
+template <glm::length_t L, typename T> struct FormatData<glm::vec<L, T>> {
   using Type = T;
   static constexpr auto length = L;
 };
-template <> struct Underlying<GL::int_2_10_10_10_rev> {
+template <> struct FormatData<GL::int_2_10_10_10_rev> {
   using Type = GL::int_2_10_10_10_rev;
   static constexpr auto length = 4;
 };
-template <> struct Underlying<GL::uint_2_10_10_10_rev> {
+template <> struct FormatData<GL::uint_2_10_10_10_rev> {
   using Type = GL::uint_2_10_10_10_rev;
   static constexpr auto length = 4;
 };
-template <> struct Underlying<GL::uint_10_11_11_rev> {
+template <> struct FormatData<GL::uint_10_11_11_rev> {
   using Type = GL::uint_10_11_11_rev;
   static constexpr auto length = 3;
 };
 
 template <typename T, bool normalize = false> struct AttrF {
-  using underlying = Underlying<T>::Type;
-  using supported_types =
-      type_list<GLfloat, GLdouble, GLbyte, GLubyte, GLshort, GLushort, GLint,
-                GLuint, GL::int_2_10_10_10_rev, GL::uint_2_10_10_10_rev,
-                GL::uint_10_11_11_rev>; // missing half and fixed
-  static_assert(contains<underlying, supported_types>::value,
-                "unsupported type for glVertexAttribPointer");
-  using type = T;
+private:
+  using format_data = FormatData<T>;
+  using underlying = format_data::Type;
 
-  template <GLint size, GLenum type>
+  using floating_types =
+      type_list<GL::half_float, GLfloat, GLdouble, GL::fixed>;
+  using integer_types =
+      type_list<GLbyte, GLubyte, GLshort, GLushort, GLint, GLuint,
+                GL::int_2_10_10_10_rev, GL::uint_2_10_10_10_rev,
+                GL::uint_10_11_11_rev>;
+  static_assert((contains_v<underlying, floating_types> && !normalize) ||
+                    contains_v<underlying, integer_types>,
+                "unsupported type for glVertexAttribPointer");
+
+public:
+  using Type = T;
   static void format(const GLuint vaoID, const GLuint attrIndex,
                      const GLint offset) {
-    glVertexArrayAttribFormat(vaoID, attrIndex, size, type, normalize, offset);
+    glVertexArrayAttribFormat(vaoID, attrIndex, format_data::length,
+                              GL::macroOf<underlying>, normalize, offset);
   }
 };
 template <typename T> struct AttrI {
-  using underlying = Underlying<T>::Type;
+private:
+  using format_data = FormatData<T>;
+  using underlying = format_data::Type;
+
   using supported_types =
       type_list<GLbyte, GLubyte, GLshort, GLushort, GLint, GLuint>;
-  static_assert(contains<underlying, supported_types>::value,
+  static_assert(contains_v<underlying, supported_types>,
                 "unsupported type for glVertexAttribIPointer");
-  using type = T;
 
-  template <GLint size, GLenum type>
+public:
+  using Type = T;
+
   static void format(const GLuint vaoID, const GLuint attrIndex,
                      const GLint offset) {
-    glVertexArrayAttribIFormat(vaoID, attrIndex, size, type, offset);
-  }
-};
-template <typename T> struct AttrL {
-  using underlying = Underlying<T>::Type;
-  using supported_types = type_list<double>;
-  static_assert(contains<underlying, supported_types>::value,
-                "unsupported type of glVertexAttribLPointer");
-  using type = T;
-
-  template <GLint size, GLenum type>
-  static void format(const GLuint vaoID, const GLuint attrIndex,
-                     const GLint offset) {
-    glVertexArrayAttribLFormat(vaoID, attrIndex, size, type, offset);
+    glVertexArrayAttribIFormat(vaoID, attrIndex, format_data::length,
+                               GL::macroOf<underlying>, offset);
   }
 };
 
 template <typename Attr>
 void enable_single(const GLuint vaoID, const GLuint attrIndex,
                    const GLint offset) {
-  using underlying = Underlying<typename Attr::type>;
-  using value_type = underlying::Type;
   glEnableVertexArrayAttrib(vaoID, attrIndex);
-  Attr::format<underlying::length, GL::macroOf<value_type>>(vaoID, attrIndex,
-                                                            offset);
+  Attr::format(vaoID, attrIndex, offset);
   glVertexArrayAttribBinding(vaoID, attrIndex, 0);
 }
 
 template <typename... Attrs> struct Layout {
-  // private:
-  //  using list = detail::type_list<Attrs...>;
-
-  static_assert(((std::is_trivially_destructible_v<Attrs>) && ...),
+  static_assert((std::is_trivially_destructible_v<typename Attrs::Type> && ...),
                 "types should be trivially destructible");
 
   static constexpr auto DATA = ([]() {
@@ -130,8 +123,8 @@ template <typename... Attrs> struct Layout {
     std::size_t out = 0;
     std::size_t size, align;
     int i = 0;
-    ((size = sizeof(typename Attrs::type),
-      align = alignof(typename Attrs::type),
+    ((size = sizeof(typename Attrs::Type),
+      align = alignof(typename Attrs::Type),
       out = (offsets[i++] = roundUp(out, align)) + size),
      ...);
     return std::make_pair(out, std::move(offsets));
@@ -143,12 +136,7 @@ template <typename... Attrs> struct Layout {
 
 public:
   constexpr Layout() = default;
-  // Layout(const Attrs &...args) {
-  //   int i = 0;
-  //   // placement new constexpr in c++ 26
-  //   ((*(new (storage + OFFSETS[i++]) Attrs) = args), ...);
-  // }
-  constexpr Layout(const Attrs::type &...args) {
+  constexpr Layout(const Attrs::Type &...args) {
     constexpr auto constexpr_memcpy = [](std::byte *dest, const auto x) {
       constexpr auto size = sizeof(x);
       using arr = std::array<std::byte, size>;
@@ -161,12 +149,6 @@ public:
     (constexpr_memcpy(storage + OFFSETS[i++], args), ...);
   }
 
-  // template <std::size_t I> auto &get() {
-  //   static_assert(I < SIZE);
-  //   using Type = detail::subscript<list, I>::type;
-  //   return *std::launder(reinterpret_cast<Type *>(storage + OFFSETS[I]));
-  // }
-
   static void enable(const GLuint vaoID) {
     GLuint attrIndex = 0;
     ((enable_single<Attrs>(vaoID, attrIndex,
@@ -177,20 +159,18 @@ public:
 };
 } // namespace detail
 
-using detail::Layout, detail::AttrF, detail::AttrI, detail::AttrL;
+using detail::Layout, detail::AttrF, detail::AttrI;
 
 using pos = Layout<AttrF<glm::vec3>>;
 
 using postex = Layout<AttrF<glm::vec3>, AttrF<glm::vec2>>;
 
-using postex2 = Layout<AttrF<glm::vec3>, AttrF<GL::uint_10_11_11_rev, true>>;
+using postex2 = Layout<AttrF<glm::vec3>, AttrF<glm::u16vec2, true>>;
 
-// using posnorm = Layout<AttrF<glm::vec3>, AttrF<glm::vec3>>;
 using posnorm = Layout<AttrF<glm::vec3>, AttrF<GL::int_2_10_10_10_rev, true>>;
 
-// using postexnorm = Layout<AttrF<glm::vec3>, AttrF<GL::uint_10_11_11_rev,
-// true>,
-//                           AttrF<GL::int_2_10_10_10_rev, true>>;
+using postexnorm = Layout<AttrF<glm::vec3>, AttrF<glm::u16vec2, true>,
+                          AttrF<GL::int_2_10_10_10_rev, true>>;
 
 using sphere = Layout<AttrF<glm::vec3>, AttrF<float>>;
 
@@ -207,9 +187,6 @@ using normalmap = Layout<AttrF<glm::vec3>, AttrF<glm::vec3>, AttrF<glm::vec3>,
                          AttrF<glm::vec2>>;
 
 using align = Layout<AttrF<glm::vec3>, AttrI<GLbyte>, AttrI<GLbyte>>;
-
-// using posnorm2 = Layout<AttrF<glm::vec3>, AttrF<GL::int_2_10_10_10_rev,
-// true>>;
 } // namespace shaders::vertex_layout
 
 namespace vert_lay = shaders::vertex_layout;

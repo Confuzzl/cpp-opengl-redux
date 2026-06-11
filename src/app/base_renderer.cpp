@@ -51,7 +51,7 @@ void BaseRenderer::renderSidebarPostlude() const {
   ImGui::Render();
   ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 }
-void BaseRenderer::renderImpl(const float dt) const {
+void BaseRenderer::renderImpl([[maybe_unused]] const float dt) const {
   {
     using namespace shaders;
     getUBO<uniforms::CameraBlock>().update(world->cam.matrix());
@@ -59,48 +59,28 @@ void BaseRenderer::renderImpl(const float dt) const {
 
   static const auto &LIGHT_TEXTURE =
       GL::Texture::shared<"light.png", GL_NEAREST>();
-  // static GL::Texture tex{"light.png", GL_NEAREST};
-
-  static constexpr vert_lay::postex light[]{
-      vert_lay::postex{{-0.5, -0.5, 0}, {0, 0}},
-      vert_lay::postex{{+0.5, -0.5, 0}, {1, 0}},
-      vert_lay::postex{{+0.5, +0.5, 0}, {1, 1}},
-      vert_lay::postex{{-0.5, +0.5, 0}, {0, 1}},
-  };
 
   static constexpr vert_lay::postex2 LIGHT_VERTICES[]{
-      vert_lay::postex2{{-0.5, -0.5, 0},
-                        GL::uint_10_11_11_rev::from_uv({0, 0})},
-      vert_lay::postex2{{+0.5, -0.5, 0},
-                        GL::uint_10_11_11_rev::from_uv({1, 0})},
-      vert_lay::postex2{{+0.5, +0.5, 0},
-                        GL::uint_10_11_11_rev::from_uv({1, 1})},
-      vert_lay::postex2{{-0.5, +0.5, 0},
-                        GL::uint_10_11_11_rev::from_uv({0, 1})},
+      vert_lay::postex2{{-0.5, -0.5, 0}, GL::uv_as_short({0, 0})},
+      vert_lay::postex2{{+0.5, -0.5, 0}, GL::uv_as_short({1, 0})},
+      vert_lay::postex2{{+0.5, +0.5, 0}, GL::uv_as_short({1, 1})},
+      vert_lay::postex2{{-0.5, +0.5, 0}, GL::uv_as_short({0, 1})},
   };
-  static constexpr glm::vec3 foo = GL::uint_10_11_11_rev::from_uv({0.6, 1.0});
-
+  static GL::VBO<vert_lay::postex2> LIGHT{LIGHT_VERTICES};
   static constexpr auto INDICES = {
       0, 1, 2, 0, 2, 3,
   };
   static GL::EBO EBO{INDICES};
-  static GL::VBO<vert_lay::postex> LIGHT{light};
-  // static GL::VBO<vert_lay::postex2> LIGHT{LIGHT_VERTICES};
 
   // https://gamedev.stackexchange.com/a/150705
   auto billboard = glm::transpose(world->cam.matrix());
   billboard[0][3] = 0;
   billboard[1][3] = 0;
   billboard[2][3] = 0;
-  billboard[3] = glm::vec4{world->light, 1.0};
+  billboard[3] = {world->light, 1.0};
 
-  // app()
-  //     .shaders.texcol2.bindTextureSampler(LIGHT_TEXTURE)
-  //     .setModel(billboard)
-  //     .setFragColor(world->lightColor)
-  //     .draw(GL_TRIANGLES, LIGHT, EBO);
   app()
-      .shaders.texcol.bindTextureSampler(LIGHT_TEXTURE)
+      .shaders.texcol2.bindTextureSampler(LIGHT_TEXTURE)
       .setModel(billboard)
       .setFragColor(world->lightColor)
       .draw(GL_TRIANGLES, LIGHT, EBO);
@@ -113,12 +93,7 @@ void BaseRenderer::renderImpl(const float dt) const {
       p[i] = 10;
       AXIS.write({{}});
       AXIS.write({p});
-      app()
-          .shaders
-          .basic
-          //.setCamera(world->cam.matrix())
-          .setModel({1.0f})
-          .setFragColor(COLORS[i])
-          .draw(GL_LINES, AXIS);
+      app().shaders.basic.setModel({1.0f}).setFragColor(COLORS[i]).draw(
+          GL_LINES, AXIS);
     }
 }

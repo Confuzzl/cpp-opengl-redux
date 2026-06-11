@@ -15,7 +15,8 @@ glm::vec2 Cursor::dGamePos{};
 
 static bool first = false;
 
-void Cursor::cursorPosCallback(GLFWwindow *window, double xpos, double ypos) {
+void Cursor::cursorPosCallback([[maybe_unused]] GLFWwindow *window, double xpos, double ypos)
+{
   prevWindowPos = windowPos;
   prevGamePos = gamePos;
   const auto windowSize = app().windowSize;
@@ -25,25 +26,31 @@ void Cursor::cursorPosCallback(GLFWwindow *window, double xpos, double ypos) {
   const auto x = xpos;
   windowPos = {x * app().windowScale, y * app().windowScale};
   gamePos = {windowPos.x, (windowSize.y - y) * app().windowScale};
-  if (!first) {
+  if (!first)
+  {
     first = true;
-  } else {
+  }
+  else
+  {
     dWindowPos = windowPos - prevWindowPos;
     dGamePos = gamePos - prevGamePos;
   }
 }
 
-void InputHandler::processKeys(const float dt) {
+void InputHandler::processKeys(const float dt)
+{
   for (auto &[keycode, key] : keys)
     key(dt);
 }
-void InputHandler::keyCallback(GLFWwindow *window, int key, int scancode,
-                               int action, int mods) {
+void InputHandler::keyCallback([[maybe_unused]] GLFWwindow *window, int key, [[maybe_unused]] int scancode,
+                               int action, int mods)
+{
   if (const auto iterator = keys.find(key); iterator != keys.cend())
     iterator->second.react(action, mods);
 }
 
-void InputHandler::reset() {
+void InputHandler::reset()
+{
   for (auto &[keycode, key] : keys)
     key.reset();
 }

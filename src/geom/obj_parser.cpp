@@ -1,55 +1,132 @@
 #include "geom/obj_parser.h"
 
 #include <fstream>
+#include <optional>
 #include <sstream>
 #include <string>
 
 #include "util.h"
 
-#define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/string_cast.hpp>
 
-ObjFile ObjParser::parse(const std::string_view name) {
-  ObjFile out{};
-
+MtlFile MtlParser::parse(const std::string_view name) {
   std::ifstream file{SOURCE_DIR "/assets/models/" + std::string{name}};
   if (!file)
     throw std::runtime_error{fmt::format("unable to open {}", name)};
 
+  MtlFile out{};
+  out.name = name;
+
+  MtlFile::Material *current = nullptr;
+
   std::string line;
   while (std::getline(file, line)) {
-    // fmt::println("line: \"{}\"", line);
+    fmt::println("line: \"{}\"", line);
 
     std::istringstream stream{line};
     std::string first;
+
+    if (!(stream >> first))
+      continue;
+
+    if (first == "#")
+      continue;
+    else if (first == "newmtl") {
+      std::string mtlName;
+      stream >> mtlName;
+      current = &out.materials.emplace_back(MtlFile::Material{.name = mtlName});
+    } else if (first == "Ka") {
+      glm::vec3 ambient;
+      stream >> ambient.x >> ambient.y >> ambient.z;
+      current->ambient = ambient;
+    } else if (first == "Kd") {
+      glm::vec3 diffuse;
+      stream >> diffuse.x >> diffuse.y >> diffuse.z;
+      current->diffuse = diffuse;
+    } else if (first == "Ks") {
+      glm::vec3 specular;
+      stream >> specular.x >> specular.y >> specular.z;
+      current->specularColor = specular;
+    } else if (first == "Ns") {
+      float specular;
+      stream >> specular;
+      current->specularExponent = specular;
+    } else if (first == "map_Kd") {
+      std::string texture;
+      stream >> texture;
+      current->diffuseTexture = texture;
+    } else {
+    }
+  }
+
+  for (const auto &mtl : out.materials) {
+    fmt::println("{}: Ka={} Kd={} Ks={} Ns={} tex={}", mtl.name,
+                 glm::to_string(mtl.ambient.value_or(glm::vec3{-1})),
+                 glm::to_string(mtl.diffuse.value_or(glm::vec3{-1})),
+                 glm::to_string(mtl.specularColor.value_or(glm::vec3{-1})),
+                 mtl.specularExponent.value_or(-1),
+                 mtl.diffuseTexture.value_or("no texture"));
+  }
+
+  return out;
+}
+
+ObjFile ObjParser::parse(const std::string_view name) {
+  std::ifstream file{SOURCE_DIR "/assets/models/" + std::string{name}};
+  if (!file)
+    throw std::runtime_error{fmt::format("unable to open {}", name)};
+
+  ObjFile out{};
+  ObjFile::Object current{.name = "unnamed"};
+
+  std::string line;
+  while (std::getline(file, line)) {
+    std::istringstream stream{line};
+    std::string first;
+
     if (!(stream >> first))
       continue;
 
     if (first == "#") {
       continue;
+    } else if (first == "mtllib") {
+      std::string mtlFileName;
+      stream >> mtlFileName;
+      out.materialFiles.emplace_back(MtlParser::parse(mtlFileName));
+    } else if (first == "usemtl") {
+      std::string mtlName;
+      stream >> mtlName;
+      for (auto &file : out.materialFiles) {
+        for (auto &mtl : file.materials) {
+          if (mtl.name == mtlName) {
+            fmt::println("found and using mtl {} from {}", mtl.name, file.name);
+            current.material = mtl;
+          }
+        }
+      }
+    } else if (first == "o") {
+      out.addObject(std::move(current));
+      current = {};
+      stream >> current.name;
     } else if (first == "v") {
       glm::vec4 params;
       params.w = 1;
       stream >> params.x >> params.y >> params.z >> params.w;
 
-      const glm::vec3 point = params / params.w;
-
-      out.geometries.emplace_back(point);
-      // fmt::println("geom {} = {}", out.geometries.size(),
-      //              glm::to_string(point));
+      current.geometries.emplace_back(params / params.w);
     } else if (first == "vt") {
       glm::vec3 params;
       params.y = params.z = 1;
       stream >> params.x >> params.y >> params.z;
 
-      out.textures.emplace_back(params);
+      current.textures.emplace_back(params);
     } else if (first == "vn") {
       glm::vec3 params;
       stream >> params.x >> params.y >> params.z;
 
-      out.normals.emplace_back(params);
+      current.normals.emplace_back(params);
     } else if (first == "f") {
-      auto &face = out.faces.emplace_back();
+      auto &face = current.faces.emplace_back();
 
       std::string curr;
       while (stream >> curr) {
@@ -65,6 +142,7 @@ ObjFile ObjParser::parse(const std::string_view name) {
     } else {
     }
   }
+  out.addObject(std::move(current));
 
   return out;
 }

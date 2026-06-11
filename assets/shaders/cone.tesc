@@ -1,4 +1,4 @@
-#version 450 core
+#version 460 core
 
 const float RESOLUTION = 16;
 const float RINGS = 16; // increase for better smooth shading near tip

@@ -4,28 +4,29 @@
 #include "geom/obj_parser.h"
 #include "geom/object.h"
 #include "gl/gl_object.h"
+#include "gl/texture.h"
+#include "gl/uniform.h"
+#include "gl/vertex_layout.h"
 #include "util.h"
 
 #include <imgui.h>
 
-#include "gl/bo_heap.h"
-
 using namespace scene;
 
 Scene::Scene()
-    : BaseScene(std::in_place_type<World>, std::in_place_type<Renderer>,
-                {
-                    {},
-                    [](GLFWwindow *window, int button, int action, int mods) {
-                      (void)window, button, action, mods;
-                    },
-                    [](GLFWwindow *window, double xoffset, double yoffset) {
-                      (void)window, xoffset, yoffset;
-                    },
-                    [](GLFWwindow *window, double xpos, double ypos) {
-                      (void)window, xpos, ypos;
-                    },
-                }) {
+    : BaseScene(
+          std::in_place_type<World>, std::in_place_type<Renderer>,
+          {
+              {},
+              []([[maybe_unused]] GLFWwindow *window,
+                 [[maybe_unused]] int button, [[maybe_unused]] int action,
+                 [[maybe_unused]] int mods) {},
+              []([[maybe_unused]] GLFWwindow *window,
+                 [[maybe_unused]] double xoffset,
+                 [[maybe_unused]] double yoffset) {},
+              []([[maybe_unused]] GLFWwindow *window,
+                 [[maybe_unused]] double xpos, [[maybe_unused]] double ypos) {},
+          }) {
   world = static_cast<World *>(BaseScene::world.get());
 }
 
@@ -52,7 +53,7 @@ World::World() : BaseWorld() {
     }
     tetrahedron.color = LIGHT_RED;
     tetrahedron.transform = glm::translate(tetrahedron.transform, {-3, 0, 0});
-    objects.emplace_back(Object{"Tetrahedron", tetrahedron, Rotator{}});
+    objects.emplace_back(Object{"Tetrahedron", tetrahedron, {}});
   }
   {
     Shape cube;
@@ -73,14 +74,14 @@ World::World() : BaseWorld() {
     objects.emplace_back(Object{
         "Cube",
         cube,
-        RotationController{Rotator{}},
+        {},
     });
 
     cube.transform = glm::translate(cube.transform, {0, 2, 0});
     test = Object{
         "Test",
         cube,
-        RotationController{Rotator{}},
+        {},
     };
   }
   {
@@ -117,28 +118,49 @@ void World::update(const float dt) {
 void Renderer::renderImpl(const float dt) const {
   BaseRenderer::renderImpl(dt);
 
-  static const auto obj =
-      Obj::fromObjFile(ObjParser::parse("monkey_smooth.obj"));
+  static const auto obj = Obj::fromName("steak.obj", "GrilledMeat");
+  static GL::VBO<vert_lay::postexnorm> FANCY{1000};
+  static GL::VBO<vert_lay::posnorm> TEST{1000};
   static const auto [list, restart] = obj.triangleFanIndices<int>();
   static GL::EBO TESTEBO{list};
-  static GL::VBO<vert_lay::posnorm> TEST{1000};
   for (const auto &face : obj.faces) {
     for (const auto [c, n, t] : face.vertices) {
-      TEST.write(vert_lay::posnorm{
-          obj.positions[c],
-          GL::int_2_10_10_10_rev::from_normal(obj.normals[n]),
-      });
+      // TEST.write(vert_lay::posnorm{
+      //     obj.positions[c],
+      //     GL::int_2_10_10_10_rev::from_normal(obj.normals[n]),
+      // });
+      FANCY.write(vert_lay::postexnorm{
+          obj.positions[c], GL::uv_as_short(obj.uvs[t]),
+          GL::int_2_10_10_10_rev::from_normal(obj.normals[n])});
     }
   }
   glEnable(GL_PRIMITIVE_RESTART);
   glPrimitiveRestartIndex(restart);
+  // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+  // app()
+  //     .shaders.phong.setModel(glm::translate(glm::mat4{1.0f}, {}))
+  //     .setLight(world->light)
+  //     .setLightColor(world->lightColor)
+  //     .setCameraPos(world->cam.pos)
+  //     .setFragColor(WHITE)
+  //     .draw(GL_TRIANGLE_FAN, TEST, TESTEBO);
+  {
+    using namespace shaders::uniforms;
+    shaders::getUBO<PhongData>().update(
+        PhongData{.pos = world->light,
+                  .shininess = 512,
+                  .color = world->lightColor,
+                  .ambient = {.color = WHITE, .strength = 0.1f},
+                  .diffuse = {.color = WHITE, .strength = 1.0f},
+                  .specular = {.color = WHITE, .strength = 1.0f}});
+  }
   app()
-      .shaders.phong.setModel(glm::translate(glm::mat4{1.0f}, {}))
-      .setLight(world->light)
-      .setLightColor(world->lightColor)
+      .shaders.phong2.setModel(glm::translate(glm::mat4{1.0f}, {}))
       .setCameraPos(world->cam.pos)
-      .setFragColor(WHITE)
-      .draw(GL_TRIANGLE_FAN, TEST, TESTEBO);
+      .bindTextureSampler(GL::Texture::shared<"MeatTex.png">())
+      .draw(GL_TRIANGLE_FAN, FANCY, TESTEBO);
+
+  // glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
   glDisable(GL_PRIMITIVE_RESTART);
 
   return;
@@ -194,6 +216,8 @@ void Renderer::renderImpl(const float dt) const {
           .setFragColor(shape.color)
           .draw(GL_TRIANGLES, NORM);
       break;
+    default:
+      UNREACHABLE;
     }
   }
 
@@ -202,7 +226,7 @@ void Renderer::renderImpl(const float dt) const {
   // app().shaders.align.setModel({1.0f}).setFragColor(BLUE).draw(GL_POINTS,
   // VBO);
 }
-void Renderer::renderSidebar(const float dt) {
+void Renderer::renderSidebar([[maybe_unused]] const float dt) {
   for (auto &[name, shape, rotation] : world->objects) {
     ImGui::SeparatorText(name);
 

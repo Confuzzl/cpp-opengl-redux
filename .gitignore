@@ -399,3 +399,13 @@ FodyWeavers.xsd
 
 # JetBrains Rider
 *.sln.iml
+
+
+# override visual studio obj ignore
+!assets/**/*.obj
+
+imgui.ini
+
+CMakeUserPresets.json
+
+.clangd

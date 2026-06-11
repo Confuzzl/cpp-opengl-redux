@@ -2,22 +2,23 @@
 
 #include <functional>
 
-struct Key {
+struct Key
+{
   using Callback = std::function<void(const float)>;
-  // using Callback = void (*)(const double);
-  // static constexpr Callback NONE = [](const double) {};
 
-  static constexpr struct Hold {
+  static constexpr struct Hold
+  {
   } HOLD{};
-  static constexpr struct Just {
+  static constexpr struct Just
+  {
   } JUST{};
 
   bool on = false;
   bool justUsed = false;
 
-  int mods;
-
   Callback justOn, holdOn, justOff;
+
+  int mods;
 
   Key(const Callback justOn, const Callback holdOn, const Callback justOff,
       const int mods);

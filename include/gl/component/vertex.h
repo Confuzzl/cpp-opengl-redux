@@ -58,6 +58,12 @@ NEW_UNIFORM_BLOCK(CameraBlock);
 NEW_UNIFORM(glm::mat4, model);
 VERT_END;
 
+VERT_BEGIN(Texnorm, vertex_layout::postexnorm, "texnorm.vert");
+NEW_UNIFORM_BLOCK(ProjectionBlock);
+NEW_UNIFORM_BLOCK(CameraBlock);
+NEW_UNIFORM(glm::mat4, model);
+VERT_END;
+
 VERT_BEGIN(NormalMap, vertex_layout::normalmap, "normal_map.vert");
 NEW_UNIFORM_BLOCK(ProjectionBlock);
 NEW_UNIFORM_BLOCK(CameraBlock);

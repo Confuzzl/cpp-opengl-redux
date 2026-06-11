@@ -1,6 +1,9 @@
 #pragma once
 
+#include <cstddef>
 #include <glad/gl.h>
+#include <initializer_list>
+#include <utility>
 
 #include "gl/vertex_layout.h"
 #include "util.h"
@@ -91,12 +94,14 @@ struct EBO : BufferObject {
   GLenum type;
 
   template <typename T>
-  EBO(const T &list)
-      : BufferObject{static_cast<GLsizeiptr>(std::size(list) *
-                                             sizeof(typename T::value_type)),
-                     GL_DYNAMIC_STORAGE_BIT, std::data(list)},
-        type{macroOf<std::make_unsigned_t<typename T::value_type>>} {
-    count = static_cast<GLsizei>(std::size(list));
+  EBO(const T &list) : EBO(std::data(list), std::size(list)) {}
+
+  template <typename T>
+  EBO(const T *const data, const std::size_t size)
+      : BufferObject{static_cast<GLsizeiptr>(size * sizeof(T)),
+                     GL_DYNAMIC_STORAGE_BIT, data},
+        type{macroOf<std::make_unsigned_t<T>>} {
+    count = static_cast<GLsizei>(size);
   }
 };
 } // namespace GL

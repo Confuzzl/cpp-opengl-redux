@@ -62,7 +62,7 @@ struct Shape {
 
     const auto oldSize = shape.tris.size();
     out.tris.reserve(oldSize * 4);
-    for (int i = 0; i < oldSize; i++) {
+    for (std::size_t i = 0; i < oldSize; i++) {
       const auto &v = shape.tris[i].vertices;
       const auto v01 = glm::normalize((v[0] + v[1]) / 2.0f);
       const auto v12 = glm::normalize((v[1] + v[2]) / 2.0f);

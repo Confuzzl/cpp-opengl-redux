@@ -41,6 +41,12 @@ NEW_UNIFORM(Color, light_color);
 NEW_UNIFORM(glm::vec3, camera_pos);
 FRAG_END;
 
+FRAG_BEGIN(Phong2, "phong2.frag");
+NEW_UNIFORM(glm::vec3, camera_pos);
+NEW_UNIFORM_BLOCK(PhongData);
+NEW_SAMPLER(sampler);
+FRAG_END;
+
 FRAG_BEGIN(NormalMap, "normal_map.frag");
 NEW_SAMPLER(diffuse_map);
 NEW_SAMPLER(normal_map);

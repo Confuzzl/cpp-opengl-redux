@@ -13,7 +13,8 @@ namespace callback {
 void error(int error_code, const char *description) {
   print_err("GLFW ERROR ({}):\n{}", error_code, description);
 }
-void framebufferSize(GLFWwindow *window, int width, int height) {
+void framebufferSize([[maybe_unused]] GLFWwindow *window, int width,
+                     int height) {
   glViewport(0, 0, width, height);
   app().windowSize = {width, height};
   app().projection =
@@ -24,7 +25,7 @@ void framebufferSize(GLFWwindow *window, int width, int height) {
     getUBO<uniforms::ProjectionBlock>().update(app().projection);
   }
 }
-void windowSize(GLFWwindow *window, int width, int height) {
+void windowSize([[maybe_unused]] GLFWwindow *window, int width, int height) {
   app().windowSize = {width, height};
 }
 
@@ -95,8 +96,8 @@ static fmt::color severityColor(const GLenum severity) {
   throw std::runtime_error{"INVALID SEVERITY ENUM"};
 }
 void APIENTRY debug(GLenum source, GLenum type, GLuint id, GLenum severity,
-                    GLsizei length, const GLchar *message,
-                    const void *userParam) {
+                    [[maybe_unused]] GLsizei length, const GLchar *message,
+                    [[maybe_unused]] const void *userParam) {
   if (severity == GL_DEBUG_SEVERITY_NOTIFICATION)
     return;
   const auto src = sourceName(source);

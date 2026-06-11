@@ -11,9 +11,10 @@ find_package(glm CONFIG REQUIRED)
 add_executable(test)
 add_subdirectory("src")
 
-target_include_directories(test PRIVATE include)
+target_include_directories(test PRIVATE "include")
 target_compile_definitions(test PRIVATE SOURCE_DIR="${CMAKE_SOURCE_DIR}")
 target_compile_definitions(test PRIVATE GLM_FORCE_XYZW_ONLY) # constexpr friendly
+target_compile_definitions(test PRIVATE GLM_ENABLE_EXPERIMENTAL)
 
 if(MSVC)
 	target_compile_options(test PRIVATE /W4)

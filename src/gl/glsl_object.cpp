@@ -40,9 +40,12 @@ Shader::Shader(const GLenum type, const char *const name)
     throw std::runtime_error{
         fmt::format("COMPILATION ERROR {}\n{}", name, log)};
   }
-  fmt::println("Successfully compiled {}", name);
+  fmt::println("Successfully compiled {}:{}", name, ID);
 }
-Shader::~Shader() { glDeleteShader(ID); }
+Shader::~Shader() {
+  fmt::println("deleting shader {}", ID);
+  glDeleteShader(ID);
+}
 Shader::Shader(Shader &&o) noexcept : ID{o.ID}, type{o.type}, name{o.name} {
   o.ID = 0;
 }
@@ -73,9 +76,9 @@ Program::Program(const std::initializer_list<Shader> shaders)
     glGetProgramInfoLog(ID, size, &size, &log[0]);
     throw std::runtime_error{fmt::format("PROGRAM LINK ERROR {}\n{}", ID, log)};
   }
-  for (auto &shader : shaders) {
-    glDeleteShader(shader.ID);
-  }
+  // for (auto &shader : shaders) {
+  //   glDeleteShader(shader.ID);
+  // }
 }
 Program ::~Program() { glDeleteProgram(ID); }
 Program::Program(Program &&o) noexcept : ID{o.ID} { o.ID = 0; };

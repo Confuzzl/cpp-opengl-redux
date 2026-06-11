@@ -2,10 +2,6 @@
 
 #include "gl/uniform.h"
 
-#define NEW_UNIFORM(type, name)                                                \
-  GL::Uniform<type> name { programID, #name }
-#define NEW_UNIFORM_BLOCK(type)                                                \
-  GL::UniformBlock<shaders::uniforms::type> type { programID }
-
-#define NEW_SAMPLER(name)                                                      \
-  GL::Sampler name { programID, #name }
+#define NEW_UNIFORM(type, name) GL::Uniform<type> name{programID, #name}
+#define NEW_UNIFORM_BLOCK(type) GL::UniformBlock<shaders::uniforms::type> type{programID}
+#define NEW_SAMPLER(name) GL::Sampler name{programID, #name}

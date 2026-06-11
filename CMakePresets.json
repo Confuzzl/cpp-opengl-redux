@@ -1,14 +1,13 @@
 {
-	"version": 9,
-	"configurePresets": [
-		{
-			"name": "vcpkg",
-			"generator": "Ninja",
-			"binaryDir": "${sourceDir}/build",
-			"toolchainFile": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
-			//"cacheVariables": {
-			//	"CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
-			//}
-		}
-	]
+    "version": 8,
+    "configurePresets": [
+        {
+            "name": "vcpkg",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build",
+            "cacheVariables": {
+                "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
+            }
+        }
+    ]
 }

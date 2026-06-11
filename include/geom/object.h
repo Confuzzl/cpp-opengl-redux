@@ -3,6 +3,7 @@
 #include <glm/glm.hpp>
 
 #include <set>
+#include <string_view>
 #include <vector>
 
 #include "geom/obj_parser.h"
@@ -34,7 +35,7 @@ struct Obj {
     // runtime_array<unsign> indices{};
     unsign i = 0;
     for (const auto &face : faces) {
-      for (const auto vertex : face.vertices) {
+      for (std::size_t j = 0; j < face.vertices.size(); j++) {
         indices.emplace_back(i++);
       }
       indices.emplace_back(RESTART);
@@ -43,5 +44,8 @@ struct Obj {
     return std::make_pair(std::move(indices), RESTART);
   }
 
-  static Obj fromObjFile(const ObjFile &o);
+  static Obj fromObjFile(const ObjFile::Object &o);
+  static Obj fromName(const std::string_view filename, const std::size_t i = 0);
+  static Obj fromName(const std::string_view filename,
+                      const std::string_view n);
 };

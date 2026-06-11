@@ -135,8 +135,9 @@ template <typename V, typename F> struct NoTesselationDraw : BaseProgram<V, F> {
 };
 template <typename V, typename T, typename F>
 struct YesTesselationDraw : BaseProgram<V, F> {
+  using BaseProgram<V, F>::BaseProgram;
+
   using Base = BaseProgram<V, F>;
-  using Base::BaseProgram;
   using typename Base::VertexType;
 
   static constexpr auto PATCH_SIZE = T::PATCH_SIZE;
@@ -227,7 +228,6 @@ struct Flat : detail::GenericProgram<vert::Normal, void, void, frag::Flat> {
   SET_UNIFORM_F(FragColor, Color, frag_color, )
 };
 struct Normal : detail::GenericProgram<vert::Normal, void, void, frag::Normal> {
-  // SET_UNIFORM_V(Camera, glm::mat4 &, cam, )
   SET_UNIFORM_V(Model, glm::mat4 &, model, )
 };
 struct Phong : detail::GenericProgram<vert::Normal, void, void, frag::Phong> {
@@ -236,6 +236,12 @@ struct Phong : detail::GenericProgram<vert::Normal, void, void, frag::Phong> {
   SET_UNIFORM_F(LightColor, Color, light_color, )
   SET_UNIFORM_F(CameraPos, glm::vec3, camera_pos, )
   SET_UNIFORM_F(FragColor, Color, frag_color, )
+};
+struct Phong2
+    : detail::GenericProgram<vert::Texnorm, void, void, frag::Phong2> {
+  SET_UNIFORM_V(Model, glm::mat4 &, model, )
+  BIND_TEXTURE(Sampler, sampler);
+  SET_UNIFORM_F(CameraPos, glm::vec3, camera_pos, )
 };
 struct Sphere
     : detail::GenericProgram<vert::Sphere, void, tess::Sphere, frag::Phong> {

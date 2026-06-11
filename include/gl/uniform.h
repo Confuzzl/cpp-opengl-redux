@@ -92,6 +92,19 @@ struct CameraBlock {
   static constexpr char name[] = "CameraBlock";
   glm::mat4 cam;
 };
+struct PhongData {
+  static constexpr char name[] = "PhongData";
+
+  glm::vec3 pos;
+  float shininess;
+
+  unsigned int color;
+
+  struct {
+    unsigned int color;
+    float strength;
+  } ambient, diffuse, specular;
+};
 } // namespace uniforms
 
 namespace detail {
@@ -104,7 +117,7 @@ template <typename UniformType> GLuint getBinding() {
 
 template <typename UniformType> GL::UBO<UniformType> &getUBO() {
   static GL::UBO<UniformType> out{};
-  static auto binding = getBinding<UniformType>();
+  [[maybe_unused]] static auto binding = getBinding<UniformType>();
   return out;
 }
 } // namespace shaders
