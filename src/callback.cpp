@@ -24,6 +24,7 @@ void framebufferSize([[maybe_unused]] GLFWwindow *window, int width,
     using namespace shaders;
     getUBO<uniforms::ProjectionBlock>().update(app().projection);
   }
+  fmt::println("updating fb");
 }
 void windowSize([[maybe_unused]] GLFWwindow *window, int width, int height) {
   app().windowSize = {width, height};

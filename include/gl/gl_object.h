@@ -100,7 +100,7 @@ struct EBO : BufferObject {
   EBO(const T *const data, const std::size_t size)
       : BufferObject{static_cast<GLsizeiptr>(size * sizeof(T)),
                      GL_DYNAMIC_STORAGE_BIT, data},
-        type{macroOf<std::make_unsigned_t<T>>} {
+        type{elementTypeMacro<std::make_unsigned_t<T>>} {
     count = static_cast<GLsizei>(size);
   }
 };

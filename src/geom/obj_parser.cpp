@@ -7,6 +7,7 @@
 
 #include "util.h"
 
+#include <filesystem>
 #include <glm/gtx/string_cast.hpp>
 
 MtlFile MtlParser::parse(const std::string_view name) {
@@ -72,12 +73,14 @@ MtlFile MtlParser::parse(const std::string_view name) {
 }
 
 ObjFile ObjParser::parse(const std::string_view name) {
-  std::ifstream file{SOURCE_DIR "/assets/models/" + std::string{name}};
+  const std::filesystem::path path =
+      SOURCE_DIR "/assets/models/" + std::string{name};
+  std::ifstream file{path};
   if (!file)
     throw std::runtime_error{fmt::format("unable to open {}", name)};
 
   ObjFile out{};
-  ObjFile::Object current{.name = "unnamed"};
+  ObjFile::Object current{.name = path.stem().string()};
 
   std::string line;
   while (std::getline(file, line)) {
@@ -96,10 +99,11 @@ ObjFile ObjParser::parse(const std::string_view name) {
     } else if (first == "usemtl") {
       std::string mtlName;
       stream >> mtlName;
-      for (auto &file : out.materialFiles) {
-        for (auto &mtl : file.materials) {
+      for (auto &mtlFile : out.materialFiles) {
+        for (auto &mtl : mtlFile.materials) {
           if (mtl.name == mtlName) {
-            fmt::println("found and using mtl {} from {}", mtl.name, file.name);
+            fmt::println("found and using mtl {} from {}", mtl.name,
+                         mtlFile.name);
             current.material = mtl;
           }
         }

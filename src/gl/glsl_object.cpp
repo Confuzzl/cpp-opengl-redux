@@ -43,7 +43,7 @@ Shader::Shader(const GLenum type, const char *const name)
   fmt::println("Successfully compiled {}:{}", name, ID);
 }
 Shader::~Shader() {
-  fmt::println("deleting shader {}", ID);
+  // fmt::println("deleting shader {}", ID);
   glDeleteShader(ID);
 }
 Shader::Shader(Shader &&o) noexcept : ID{o.ID}, type{o.type}, name{o.name} {

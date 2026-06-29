@@ -26,10 +26,10 @@ struct MtlFile {
 
   Material &get(const std::size_t i) { return materials.at(i); }
   Material &get(const std::string_view name) {
-    for (auto &obj : materials)
-      if (obj.name == name)
-        return obj;
-    throw std::runtime_error{fmt::format("no object named {}", name)};
+    for (auto &mat : materials)
+      if (mat.name == name)
+        return mat;
+    throw std::runtime_error{fmt::format("no material named {}", name)};
   }
 };
 struct MtlParser {

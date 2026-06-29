@@ -115,116 +115,127 @@ void World::update(const float dt) {
     obj.rotation(dt);
 }
 
+#include <gl/glsl_object2.h>
+
 void Renderer::renderImpl(const float dt) const {
   BaseRenderer::renderImpl(dt);
 
   static const auto obj = Obj::fromName("steak.obj", "GrilledMeat");
+  static GL::Texture tex{obj.material.textureName};
   static GL::VBO<vert_lay::postexnorm> FANCY{1000};
-  static GL::VBO<vert_lay::posnorm> TEST{1000};
   static const auto [list, restart] = obj.triangleFanIndices<int>();
   static GL::EBO TESTEBO{list};
   for (const auto &face : obj.faces) {
     for (const auto [c, n, t] : face.vertices) {
-      // TEST.write(vert_lay::posnorm{
-      //     obj.positions[c],
-      //     GL::int_2_10_10_10_rev::from_normal(obj.normals[n]),
-      // });
       FANCY.write(vert_lay::postexnorm{
           obj.positions[c], GL::uv_as_short(obj.uvs[t]),
           GL::int_2_10_10_10_rev::from_normal(obj.normals[n])});
     }
   }
-  glEnable(GL_PRIMITIVE_RESTART);
-  glPrimitiveRestartIndex(restart);
-  // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-  // app()
-  //     .shaders.phong.setModel(glm::translate(glm::mat4{1.0f}, {}))
-  //     .setLight(world->light)
-  //     .setLightColor(world->lightColor)
-  //     .setCameraPos(world->cam.pos)
-  //     .setFragColor(WHITE)
-  //     .draw(GL_TRIANGLE_FAN, TEST, TESTEBO);
   {
     using namespace shaders::uniforms;
     shaders::getUBO<PhongData>().update(
         PhongData{.pos = world->light,
-                  .shininess = 512,
+                  .shininess = obj.material.shininess,
                   .color = world->lightColor,
-                  .ambient = {.color = WHITE, .strength = 0.1f},
-                  .diffuse = {.color = WHITE, .strength = 1.0f},
-                  .specular = {.color = WHITE, .strength = 1.0f}});
+                  .ambient = {.color = obj.material.ambient.color,
+                              .strength = obj.material.ambient.strength},
+                  .diffuse = {.color = obj.material.diffuse.color,
+                              .strength = obj.material.diffuse.strength},
+                  .specular = {.color = obj.material.specular.color,
+                               .strength = obj.material.specular.strength}});
   }
-  app()
-      .shaders.phong2.setModel(glm::translate(glm::mat4{1.0f}, {}))
-      .setCameraPos(world->cam.pos)
-      .bindTextureSampler(GL::Texture::shared<"MeatTex.png">())
-      .draw(GL_TRIANGLE_FAN, FANCY, TESTEBO);
+  {
+    const auto res = GL::DrawModifier::primitiveRestart(restart);
+    res.start();
 
-  // glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-  glDisable(GL_PRIMITIVE_RESTART);
+    // app()
+    //     .shaders.phong2.setModel(glm::translate(glm::mat4{1.0f}, {}))
+    //     .setCameraPos(world->cam.pos)
+    //     .bindTextureSampler(tex)
+    //     .draw(GL_TRIANGLE_FAN, FANCY, TESTEBO);
 
-  return;
-
-  if (world->renderState == World::RenderState::WIREFRAME) {
-    static GL::VBO<> WIRE{6 * 2 * 3};
-    for (const auto &[name, shape, rotation] : world->objects) {
-      for (const auto &tri : shape.tris)
-        for (const auto v : tri.vertices)
-          WIRE.write({v});
-
-      app()
-          .shaders
-          .basic
-          //.setCamera(world->cam.matrix())
-          .setModel(shape.transform * rotation.mat)
-          .setFragColor(shape.color)
-          .draw(GL_LINE_LOOP, WIRE);
-    }
-    return;
+    app()
+        .shaders2.phong2.setUniform("model", glm::mat4{1.0})
+        .setUniform("camera_pos", world->cam.pos)
+        .setSampler("sampler", tex)
+        .draw(GL_TRIANGLE_FAN, FANCY, TESTEBO);
   }
 
-  static GL::VBO<vert_lay::posnorm> NORM{6 * 2 * 3};
-  for (const auto &[name, shape, rotation] : world->objects) {
-    const auto t = shape.transform * rotation.mat;
-    const auto nm = normal_matrix(t);
-    for (const auto &tri : shape.tris) {
-      const auto normal = nm * tri.normal;
-      for (const auto v : tri.vertices)
-        NORM.write(
-            vert_lay::posnorm{v, GL::int_2_10_10_10_rev::from_normal(normal)});
-    }
+  // static struct {
+  //   glm::vec3 center{};
+  //   float innerRadius = 0.5;
+  //   float outerRadius = 1;
+  //   glm::mat4 transform{1.0f};
+  //   Color color = WHITE;
+  // } torus;
+  // static GL::VBO<vert_lay::torus> TORUS{1};
+  // TORUS.write({torus.center, torus.innerRadius, torus.outerRadius});
+  // app()
+  //     .shaders.torus.setResolution(16)
+  //     .setModel(torus.transform)
+  //     .setLight(world->light)
+  //     .setLightColor(world->lightColor)
+  //     .setCameraPos(world->cam.pos)
+  //     .setFragColor(torus.color)
+  //     .draw(TORUS);
 
-    switch (world->renderState) {
-    case World::RenderState::FLAT:
-      app()
-          .shaders.flat.setModel(t)
-          .setLight(world->light)
-          .setLightColor(world->lightColor)
-          .setFragColor(shape.color)
-          .draw(GL_TRIANGLES, NORM);
+  // if (world->renderState == World::RenderState::WIREFRAME) {
+  //   static GL::VBO<> WIRE{6 * 2 * 3};
+  //   for (const auto &[name, shape, rotation] : world->objects) {
+  //     for (const auto &tri : shape.tris)
+  //       for (const auto v : tri.vertices)
+  //         WIRE.write({v});
 
-      break;
-    case World::RenderState::NORMAL:
-      app().shaders.normal.setModel(t).draw(GL_TRIANGLES, NORM);
-      break;
-    case World::RenderState::PHONG:
-      app()
-          .shaders.phong.setModel(t)
-          .setLight(world->light)
-          .setLightColor(world->lightColor)
-          .setCameraPos(world->cam.pos)
-          .setFragColor(shape.color)
-          .draw(GL_TRIANGLES, NORM);
-      break;
-    default:
-      UNREACHABLE;
-    }
-  }
+  //    app()
+  //        .shaders
+  //        .basic
+  //        //.setCamera(world->cam.matrix())
+  //        .setModel(shape.transform * rotation.mat)
+  //        .setFragColor(shape.color)
+  //        .draw(GL_LINE_LOOP, WIRE);
+  //  }
+  //  return;
+  //}
 
-  // static GL::VBO<vert_lay::align> VBO{1};
-  // VBO.write(vert_lay::align{{0, 2, 0}, 127, -128});
-  // app().shaders.align.setModel({1.0f}).setFragColor(BLUE).draw(GL_POINTS,
-  // VBO);
+  // static GL::VBO<vert_lay::posnorm> NORM{6 * 2 * 3};
+  // for (const auto &[name, shape, rotation] : world->objects) {
+  //   const auto t = shape.transform * rotation.mat;
+  //   const auto nm = normal_matrix(t);
+  //   for (const auto &tri : shape.tris) {
+  //     const auto normal = nm * tri.normal;
+  //     for (const auto v : tri.vertices)
+  //       NORM.write(
+  //           vert_lay::posnorm{v,
+  //           GL::int_2_10_10_10_rev::from_normal(normal)});
+  //   }
+
+  //  switch (world->renderState) {
+  //  case World::RenderState::FLAT:
+  //    app()
+  //        .shaders.flat.setModel(t)
+  //        .setLight(world->light)
+  //        .setLightColor(world->lightColor)
+  //        .setFragColor(shape.color)
+  //        .draw(GL_TRIANGLES, NORM);
+
+  //    break;
+  //  case World::RenderState::NORMAL:
+  //    app().shaders.normal.setModel(t).draw(GL_TRIANGLES, NORM);
+  //    break;
+  //  case World::RenderState::PHONG:
+  //    app()
+  //        .shaders.phong.setModel(t)
+  //        .setLight(world->light)
+  //        .setLightColor(world->lightColor)
+  //        .setCameraPos(world->cam.pos)
+  //        .setFragColor(shape.color)
+  //        .draw(GL_TRIANGLES, NORM);
+  //    break;
+  //  default:
+  //    UNREACHABLE;
+  //  }
+  //}
 }
 void Renderer::renderSidebar([[maybe_unused]] const float dt) {
   for (auto &[name, shape, rotation] : world->objects) {

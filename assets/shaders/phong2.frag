@@ -24,16 +24,15 @@ in vec3 normal;
 
 out vec4 color;
 
-vec4 rgba(const uint color) {
+vec3 rgb(const uint color) {
 	const uint r = color >> 24u & 0xffu;
 	const uint g = color >> 16u & 0xffu;
 	const uint b = color >> 8u & 0xffu;
-	const uint a = color & 0xffu;
-	return vec4(r, g, b, a) / 255.0;
+	return vec3(r, g, b) / 255.0;
 }
 
-vec4 reflector_combine(const uint color, const float strength) {
-    return rgba(color) * strength;
+vec3 reflector_combine(const uint color, const float strength) {
+    return rgb(color) * strength;
 }
 
 void main() {
@@ -47,11 +46,11 @@ void main() {
     const float diffuse_factor = max(0, dot(normal, light_dir));
     const float specular_factor = pow(max(0, dot(view, ref)), shininess);
 
-    const vec4 ambient = reflector_combine(ambient_color, ambient_strength);
-    const vec4 diffuse = reflector_combine(diffuse_color, diffuse_strength) * diffuse_factor;
-    const vec4 specular = reflector_combine(specular_color, specular_strength) * specular_factor;
+    const vec3 ambient = reflector_combine(ambient_color, ambient_strength);
+    const vec3 diffuse = reflector_combine(diffuse_color, diffuse_strength) * diffuse_factor;
+    const vec3 specular = reflector_combine(specular_color, specular_strength) * specular_factor;
 
     const vec4 tex = texture(sampler, uv);
 
-    color = (ambient + diffuse + specular) * tex;
+    color = vec4(ambient + diffuse + specular, 1.0) * tex;
 }

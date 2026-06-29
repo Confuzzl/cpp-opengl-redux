@@ -76,23 +76,20 @@ struct Sampler {
   GLuint binding;
 
   Sampler(const GLuint programID, const char *name);
-
-private:
-  static GLuint getBinding(const GLuint shaderID, const char *name);
 };
 } // namespace GL
 
 namespace shaders {
 namespace uniforms {
-struct ProjectionBlock {
+struct alignas(16) ProjectionBlock {
   static constexpr char name[] = "ProjectionBlock";
   glm::mat4 proj;
 };
-struct CameraBlock {
+struct alignas(16) CameraBlock {
   static constexpr char name[] = "CameraBlock";
   glm::mat4 cam;
 };
-struct PhongData {
+struct alignas(16) PhongData {
   static constexpr char name[] = "PhongData";
 
   glm::vec3 pos;
@@ -117,7 +114,7 @@ template <typename UniformType> GLuint getBinding() {
 
 template <typename UniformType> GL::UBO<UniformType> &getUBO() {
   static GL::UBO<UniformType> out{};
-  [[maybe_unused]] static auto binding = getBinding<UniformType>();
+  //[[maybe_unused]] static auto binding = getBinding<UniformType>();
   return out;
 }
 } // namespace shaders

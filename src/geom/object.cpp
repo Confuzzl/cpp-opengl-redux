@@ -4,6 +4,11 @@
 #include <fmt/ranges.h>
 #include <string_view>
 
+Material::Material()
+    : textureName{"blank.png"}, ambient{.color = WHITE, .strength = 0.1},
+      diffuse{.color = WHITE, .strength = 1.0},
+      specular{.color = WHITE, .strength = 1.0}, shininess{128} {}
+
 Obj Obj::fromObjFile(const ObjFile::Object &o) {
   Obj out{};
   out.positions = {o.geometries.begin(), o.geometries.end()};
@@ -29,9 +34,8 @@ Obj Obj::fromObjFile(const ObjFile::Object &o) {
     }
   }
 
-  // for (int i = 0; i < out.adjacency.size(); i++) {
-  //   fmt::println("{}: [{}]", i, fmt::join(out.adjacency[i], ","));
-  // }
+  if (o.material.diffuseTexture)
+    out.material.textureName = o.material.diffuseTexture.value();
 
   return out;
 }

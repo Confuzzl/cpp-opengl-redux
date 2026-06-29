@@ -1,14 +1,15 @@
 #pragma once
 
-#include <glad/gl.h>
+#include "glad/gl.h"
 #include <glm/glm.hpp>
 
 #include <array>
+#include <bit>
 #include <concepts>
 #include <cstddef>
 #include <utility>
 
-#include "util.h"
+#include "gl_util.h"
 
 namespace shaders::vertex_layout {
 namespace detail {
@@ -78,7 +79,7 @@ public:
   static void format(const GLuint vaoID, const GLuint attrIndex,
                      const GLint offset) {
     glVertexArrayAttribFormat(vaoID, attrIndex, format_data::length,
-                              GL::macroOf<underlying>, normalize, offset);
+                              GL::attribTypeMacro<underlying>, normalize, offset);
   }
 };
 template <typename T> struct AttrI {
@@ -97,7 +98,7 @@ public:
   static void format(const GLuint vaoID, const GLuint attrIndex,
                      const GLint offset) {
     glVertexArrayAttribIFormat(vaoID, attrIndex, format_data::length,
-                               GL::macroOf<underlying>, offset);
+                               GL::attribTypeMacro<underlying>, offset);
   }
 };
 

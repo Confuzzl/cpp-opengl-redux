@@ -85,7 +85,12 @@ SET_VECTOR(glm::vec2, 2f)
 SET_VECTOR(glm::vec3, 3f)
 SET_VECTOR(glm::uvec2, 2ui)
 SET_VECTOR(glm::uvec3, 3ui)
-SET_MATRIX(glm::mat4, 4)
+template <>
+inline void setUniform(const Program &p, const GL::Uniform<glm::mat4> &uniform,
+                       const glm::mat4 value) {
+  glad_glProgramUniformMatrix4fv(p.ID, uniform.location, 1, 0,
+                                 glm::value_ptr(value));
+}
 } // namespace GL
 
 namespace shaders {
