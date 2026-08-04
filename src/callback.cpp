@@ -7,10 +7,11 @@
 #include <string_view>
 
 #include "app/app.h"
+#include "gl/uniform.h"
 #include "util.h"
 
 namespace callback {
-void error(int error_code, const char *description) {
+void error(int error_code, const char *const description) {
   print_err("GLFW ERROR ({}):\n{}", error_code, description);
 }
 void framebufferSize([[maybe_unused]] GLFWwindow *window, int width,
@@ -21,10 +22,9 @@ void framebufferSize([[maybe_unused]] GLFWwindow *window, int width,
       glm::perspectiveFov(glm::radians(90.0f), static_cast<float>(width),
                           static_cast<float>(height), 0.1f, 500.f);
   {
-    using namespace shaders;
-    getUBO<uniforms::ProjectionBlock>().update(app().projection);
+    using namespace shaders::uniforms;
+    shared<ProjectionBlock>().update(app().projection);
   }
-  fmt::println("updating fb");
 }
 void windowSize([[maybe_unused]] GLFWwindow *window, int width, int height) {
   app().windowSize = {width, height};

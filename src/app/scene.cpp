@@ -1,9 +1,9 @@
 #include "app/scene.h"
 
 #include "app/app.h"
-#include "geom/obj_parser.h"
 #include "geom/object.h"
 #include "gl/gl_object.h"
+#include "gl/glsl_object.h"
 #include "gl/texture.h"
 #include "gl/uniform.h"
 #include "gl/vertex_layout.h"
@@ -105,7 +105,7 @@ World::World() : BaseWorld() {
     objects.emplace_back(Object{
         "Octahedron",
         octahedron,
-        RotationController{Rotator{}},
+        {},
     });
   }
 }
@@ -115,52 +115,55 @@ void World::update(const float dt) {
     obj.rotation(dt);
 }
 
-#include <gl/glsl_object2.h>
-
 void Renderer::renderImpl(const float dt) const {
   BaseRenderer::renderImpl(dt);
 
-  static const auto obj = Obj::fromName("steak.obj", "GrilledMeat");
-  static GL::Texture tex{obj.material.textureName};
-  static GL::VBO<vert_lay::postexnorm> FANCY{1000};
-  static const auto [list, restart] = obj.triangleFanIndices<int>();
-  static GL::EBO TESTEBO{list};
-  for (const auto &face : obj.faces) {
-    for (const auto [c, n, t] : face.vertices) {
-      FANCY.write(vert_lay::postexnorm{
-          obj.positions[c], GL::uv_as_short(obj.uvs[t]),
-          GL::int_2_10_10_10_rev::from_normal(obj.normals[n])});
-    }
-  }
-  {
-    using namespace shaders::uniforms;
-    shaders::getUBO<PhongData>().update(
-        PhongData{.pos = world->light,
-                  .shininess = obj.material.shininess,
-                  .color = world->lightColor,
-                  .ambient = {.color = obj.material.ambient.color,
-                              .strength = obj.material.ambient.strength},
-                  .diffuse = {.color = obj.material.diffuse.color,
-                              .strength = obj.material.diffuse.strength},
-                  .specular = {.color = obj.material.specular.color,
-                               .strength = obj.material.specular.strength}});
-  }
-  {
-    const auto res = GL::DrawModifier::primitiveRestart(restart);
-    res.start();
+  static const auto &tex =
+      GL::Texture::shared<"noise.png", GL_LINEAR, GL_REPEAT, true>();
+  static const auto foo = tex.sample({0.5, 0.5});
 
-    // app()
-    //     .shaders.phong2.setModel(glm::translate(glm::mat4{1.0f}, {}))
-    //     .setCameraPos(world->cam.pos)
-    //     .bindTextureSampler(tex)
-    //     .draw(GL_TRIANGLE_FAN, FANCY, TESTEBO);
+  // static const auto obj = Obj::fromName("steak.obj", "GrilledMeat");
+  // static GL::Texture tex{obj.material.textureName};
+  // static GL::VBO<vert_lay::postexnorm> FANCY{1000};
+  // static const auto [list, restart] = obj.triangleFanIndices<int>();
+  // static GL::EBO TESTEBO{list};
+  // for (const auto &face : obj.faces) {
+  //   for (const auto [c, n, t] : face.vertices) {
+  //     FANCY.write(vert_lay::postexnorm{
+  //         obj.positions[c], GL::uv_as_short(obj.uvs[t]),
+  //         GL::int_2_10_10_10_rev::from_normal(obj.normals[n])});
+  //   }
+  // }
+  // {
+  //   using namespace shaders::uniforms;
+  //   // shared<PhongData>().update(
+  //   //     {.pos = world->light,
+  //   //      .shininess = obj.material.shininess,
+  //   //      .color = world->lightColor,
+  //   //      .ambient = {.color = obj.material.ambient.color,
+  //   //                  .strength = obj.material.ambient.strength},
+  //   //      .diffuse = {.color = obj.material.diffuse.color,
+  //   //                  .strength = obj.material.diffuse.strength},
+  //   //      .specular = {.color = obj.material.specular.color,
+  //   //                   .strength = obj.material.specular.strength}});
+  //   shared<PhongData>().update(
+  //       {.pos = world->light,
+  //        .shininess = 512,
+  //        .color = world->lightColor,
+  //        .ambient = {.color = WHITE, .strength = 0.1f},
+  //        .diffuse = {.color = WHITE, .strength = 1.0f},
+  //        .specular = {.color = WHITE, .strength = 1.0f}});
+  // }
+  // {
+  //   const auto res = GL::DrawModifier::primitiveRestart(restart);
+  //   res.start();
 
-    app()
-        .shaders2.phong2.setUniform("model", glm::mat4{1.0})
-        .setUniform("camera_pos", world->cam.pos)
-        .setSampler("sampler", tex)
-        .draw(GL_TRIANGLE_FAN, FANCY, TESTEBO);
-  }
+  //   app()
+  //       .shaders.phong2.set("model", glm::mat4{1.0})
+  //       .set("camera_pos", world->cam.pos)
+  //       .bind("sampler", tex)
+  //       .draw(GL_TRIANGLE_FAN, FANCY, TESTEBO);
+  // }
 
   // static struct {
   //   glm::vec3 center{};

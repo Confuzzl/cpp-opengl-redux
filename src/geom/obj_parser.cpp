@@ -22,7 +22,7 @@ MtlFile MtlParser::parse(const std::string_view name) {
 
   std::string line;
   while (std::getline(file, line)) {
-    fmt::println("line: \"{}\"", line);
+    // fmt::println("line: \"{}\"", line);
 
     std::istringstream stream{line};
     std::string first;
@@ -61,12 +61,12 @@ MtlFile MtlParser::parse(const std::string_view name) {
   }
 
   for (const auto &mtl : out.materials) {
-    fmt::println("{}: Ka={} Kd={} Ks={} Ns={} tex={}", mtl.name,
-                 glm::to_string(mtl.ambient.value_or(glm::vec3{-1})),
-                 glm::to_string(mtl.diffuse.value_or(glm::vec3{-1})),
-                 glm::to_string(mtl.specularColor.value_or(glm::vec3{-1})),
-                 mtl.specularExponent.value_or(-1),
-                 mtl.diffuseTexture.value_or("no texture"));
+    print_info("{}: Ka={} Kd={} Ks={} Ns={} tex={}", mtl.name,
+               glm::to_string(mtl.ambient.value_or(glm::vec3{-1})),
+               glm::to_string(mtl.diffuse.value_or(glm::vec3{-1})),
+               glm::to_string(mtl.specularColor.value_or(glm::vec3{-1})),
+               mtl.specularExponent.value_or(-1),
+               mtl.diffuseTexture.value_or("no texture"));
   }
 
   return out;
@@ -102,8 +102,8 @@ ObjFile ObjParser::parse(const std::string_view name) {
       for (auto &mtlFile : out.materialFiles) {
         for (auto &mtl : mtlFile.materials) {
           if (mtl.name == mtlName) {
-            fmt::println("found and using mtl {} from {}", mtl.name,
-                         mtlFile.name);
+            print_info("found and using mtl {} from {}", mtl.name,
+                       mtlFile.name);
             current.material = mtl;
           }
         }

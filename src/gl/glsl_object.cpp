@@ -5,8 +5,11 @@
 
 #include <filesystem>
 #include <fstream>
+#include <stdexcept>
 #include <string>
+#include <string_view>
 
+#include "gl/uniform.h"
 #include "util.h"
 
 static std::string sourceToString(const std::string &name) {
@@ -19,12 +22,12 @@ static std::string sourceToString(const std::string &name) {
   return {std::istreambuf_iterator<char>{in}, std::istreambuf_iterator<char>{}};
 }
 
-namespace GL {
+namespace GL::test {
 Shader::Shader(const GLenum type, const char *const name)
-    : ID{glCreateShader(type)}, type{type}, name{name} {
-  const std::string temp =
+    : IDHolder(glCreateShader(type)), type{type}, name{name} {
+  const auto temp =
       sourceToString(fmt::format(SOURCE_DIR "/assets/shaders/{}", name));
-  const char *chars = temp.c_str();
+  const auto chars = temp.c_str();
   glShaderSource(ID, 1, &chars, nullptr);
 
   glCompileShader(ID);
@@ -42,31 +45,13 @@ Shader::Shader(const GLenum type, const char *const name)
   }
   fmt::println("Successfully compiled {}:{}", name, ID);
 }
-Shader::~Shader() {
-  // fmt::println("deleting shader {}", ID);
-  glDeleteShader(ID);
-}
-Shader::Shader(Shader &&o) noexcept : ID{o.ID}, type{o.type}, name{o.name} {
-  o.ID = 0;
-}
-Shader &Shader::operator=(Shader &&o) noexcept {
-  ID = o.ID;
-  type = o.type;
-  name = o.name;
-  o.ID = 0;
-  return *this;
-}
+Shader::~Shader() { glDeleteShader(ID); }
 
-Program::Program(const std::initializer_list<Shader> shaders)
-    : ID{glCreateProgram()} {
-  if (!ID) // TODO
-    (void)0;
-  fmt::println("Program created: {}", ID);
-  for (auto &shader : shaders) {
-    glAttachShader(ID, shader.ID);
-  }
+Program ::~Program() { glDeleteProgram(ID); }
+
+void Program::linkProgram() const {
   glLinkProgram(ID);
-  GLint success = 0;
+  GLint success;
   glGetProgramiv(ID, GL_LINK_STATUS, &success);
   if (!success) {
     GLint size = 0;
@@ -76,15 +61,215 @@ Program::Program(const std::initializer_list<Shader> shaders)
     glGetProgramInfoLog(ID, size, &size, &log[0]);
     throw std::runtime_error{fmt::format("PROGRAM LINK ERROR {}\n{}", ID, log)};
   }
-  // for (auto &shader : shaders) {
-  //   glDeleteShader(shader.ID);
+}
+
+enum struct UniformTypeCategory { SCALAR, SAMPLER, IMAGE, ATOMIC };
+static UniformTypeCategory getTypeCategory(const GLenum type) {
+  switch (type) {
+  case GL_FLOAT:
+  case GL_FLOAT_VEC2:
+  case GL_FLOAT_VEC3:
+  case GL_FLOAT_VEC4:
+  case GL_DOUBLE:
+  case GL_DOUBLE_VEC2:
+  case GL_DOUBLE_VEC3:
+  case GL_DOUBLE_VEC4:
+  case GL_INT:
+  case GL_INT_VEC2:
+  case GL_INT_VEC3:
+  case GL_INT_VEC4:
+  case GL_UNSIGNED_INT:
+  case GL_UNSIGNED_INT_VEC2:
+  case GL_UNSIGNED_INT_VEC3:
+  case GL_UNSIGNED_INT_VEC4:
+  case GL_BOOL:
+  case GL_BOOL_VEC2:
+  case GL_BOOL_VEC3:
+  case GL_BOOL_VEC4:
+  case GL_FLOAT_MAT2:
+  case GL_FLOAT_MAT3:
+  case GL_FLOAT_MAT4:
+  case GL_FLOAT_MAT2x3:
+  case GL_FLOAT_MAT2x4:
+  case GL_FLOAT_MAT3x2:
+  case GL_FLOAT_MAT3x4:
+  case GL_FLOAT_MAT4x2:
+  case GL_FLOAT_MAT4x3:
+  case GL_DOUBLE_MAT2:
+  case GL_DOUBLE_MAT3:
+  case GL_DOUBLE_MAT4:
+  case GL_DOUBLE_MAT2x3:
+  case GL_DOUBLE_MAT2x4:
+  case GL_DOUBLE_MAT3x2:
+  case GL_DOUBLE_MAT3x4:
+  case GL_DOUBLE_MAT4x2:
+  case GL_DOUBLE_MAT4x3:
+    return UniformTypeCategory::SCALAR;
+  case GL_SAMPLER_1D:
+  case GL_SAMPLER_2D:
+  case GL_SAMPLER_3D:
+  case GL_SAMPLER_CUBE:
+  case GL_SAMPLER_1D_SHADOW:
+  case GL_SAMPLER_2D_SHADOW:
+  case GL_SAMPLER_1D_ARRAY:
+  case GL_SAMPLER_2D_ARRAY:
+  case GL_SAMPLER_1D_ARRAY_SHADOW:
+  case GL_SAMPLER_2D_ARRAY_SHADOW:
+  case GL_SAMPLER_2D_MULTISAMPLE:
+  case GL_SAMPLER_2D_MULTISAMPLE_ARRAY:
+  case GL_SAMPLER_CUBE_SHADOW:
+  case GL_SAMPLER_BUFFER:
+  case GL_SAMPLER_2D_RECT:
+  case GL_SAMPLER_2D_RECT_SHADOW:
+  case GL_INT_SAMPLER_1D:
+  case GL_INT_SAMPLER_2D:
+  case GL_INT_SAMPLER_3D:
+  case GL_INT_SAMPLER_CUBE:
+  case GL_INT_SAMPLER_1D_ARRAY:
+  case GL_INT_SAMPLER_2D_ARRAY:
+  case GL_INT_SAMPLER_2D_MULTISAMPLE:
+  case GL_INT_SAMPLER_2D_MULTISAMPLE_ARRAY:
+  case GL_INT_SAMPLER_BUFFER:
+  case GL_INT_SAMPLER_2D_RECT:
+  case GL_UNSIGNED_INT_SAMPLER_1D:
+  case GL_UNSIGNED_INT_SAMPLER_2D:
+  case GL_UNSIGNED_INT_SAMPLER_3D:
+  case GL_UNSIGNED_INT_SAMPLER_CUBE:
+  case GL_UNSIGNED_INT_SAMPLER_1D_ARRAY:
+  case GL_UNSIGNED_INT_SAMPLER_2D_ARRAY:
+  case GL_UNSIGNED_INT_SAMPLER_2D_MULTISAMPLE:
+  case GL_UNSIGNED_INT_SAMPLER_2D_MULTISAMPLE_ARRAY:
+  case GL_UNSIGNED_INT_SAMPLER_BUFFER:
+  case GL_UNSIGNED_INT_SAMPLER_2D_RECT:
+    return UniformTypeCategory::SAMPLER;
+  case GL_IMAGE_1D:
+  case GL_IMAGE_2D:
+  case GL_IMAGE_3D:
+  case GL_IMAGE_2D_RECT:
+  case GL_IMAGE_CUBE:
+  case GL_IMAGE_BUFFER:
+  case GL_IMAGE_1D_ARRAY:
+  case GL_IMAGE_2D_ARRAY:
+  case GL_IMAGE_2D_MULTISAMPLE:
+  case GL_IMAGE_2D_MULTISAMPLE_ARRAY:
+  case GL_INT_IMAGE_1D:
+  case GL_INT_IMAGE_2D:
+  case GL_INT_IMAGE_3D:
+  case GL_INT_IMAGE_2D_RECT:
+  case GL_INT_IMAGE_CUBE:
+  case GL_INT_IMAGE_BUFFER:
+  case GL_INT_IMAGE_1D_ARRAY:
+  case GL_INT_IMAGE_2D_ARRAY:
+  case GL_INT_IMAGE_2D_MULTISAMPLE:
+  case GL_INT_IMAGE_2D_MULTISAMPLE_ARRAY:
+  case GL_UNSIGNED_INT_IMAGE_1D:
+  case GL_UNSIGNED_INT_IMAGE_2D:
+  case GL_UNSIGNED_INT_IMAGE_3D:
+  case GL_UNSIGNED_INT_IMAGE_2D_RECT:
+  case GL_UNSIGNED_INT_IMAGE_CUBE:
+  case GL_UNSIGNED_INT_IMAGE_BUFFER:
+  case GL_UNSIGNED_INT_IMAGE_1D_ARRAY:
+  case GL_UNSIGNED_INT_IMAGE_2D_ARRAY:
+  case GL_UNSIGNED_INT_IMAGE_2D_MULTISAMPLE:
+  case GL_UNSIGNED_INT_IMAGE_2D_MULTISAMPLE_ARRAY:
+    return UniformTypeCategory::IMAGE;
+  case GL_UNSIGNED_INT_ATOMIC_COUNTER:
+    return UniformTypeCategory::ATOMIC;
+  }
+  UNREACHABLE;
+}
+
+void Program::setupUniforms() {
+  // https://stackoverflow.com/a/16302850/31514738
+
+  GLint numUniforms;
+  glGetProgramiv(ID, GL_ACTIVE_UNIFORMS, &numUniforms);
+
+  GLint uniformMaxLength;
+  glGetProgramiv(ID, GL_ACTIVE_UNIFORM_MAX_LENGTH, &uniformMaxLength);
+
+  std::string name;
+  name.reserve(uniformMaxLength);
+
+  for (auto i = 0; i < numUniforms; i++) {
+    GLsizei length;
+    [[maybe_unused]] GLsizei size;
+    GLenum type;
+    glGetActiveUniform(ID, i, uniformMaxLength, &length, &size, &type,
+                       name.data());
+
+    const GLint location = glGetUniformLocation(ID, name.c_str());
+
+    if (location == -1) {
+      // print_warn("block {}", name.c_str());
+      continue; // is block
+    }
+
+    uniforms.emplace(std::string(name.c_str(), length),
+                     UniformData{.location = location, .type = type});
+    if (getTypeCategory(type) == UniformTypeCategory::SAMPLER) {
+      GLuint binding;
+      glGetUniformuiv(ID, location, &binding);
+      samplers.emplace(std::string(name.c_str(), length), binding);
+    }
+  }
+
+  // for (const auto &[name, data] : uniforms) {
+  //   fmt::println("{}: {} {}", name, data.location,
+  //                GL::uniformTypeToString(data.type));
   // }
 }
-Program ::~Program() { glDeleteProgram(ID); }
-Program::Program(Program &&o) noexcept : ID{o.ID} { o.ID = 0; };
-Program &Program::operator=(Program &&o) noexcept {
-  ID = o.ID;
-  o.ID = 0;
-  return *this;
+
+template <typename... Ts>
+static auto checkUniformBlockData(const std::string_view name,
+                                  const std::size_t size) {
+  [[gnu::used]] static const auto INITIALIZE_SHARED_UBOS = ([]() {
+    (shaders::uniforms::shared<Ts>(), ...);
+    return 0;
+  })();
+
+  GLuint outBinding;
+  bool nameMatch, sizeMatch;
+  const bool found =
+      ((nameMatch = name == Ts::name, sizeMatch = sizeof(Ts) == size,
+        nameMatch
+            ? (sizeMatch
+                   ? (outBinding = shaders::uniforms::shared<Ts>().binding,
+                      true)
+                   : throw std::runtime_error{fmt::format(
+                         "uniform block matches name {} but not size {} != {}",
+                         name, size, sizeof(Ts))})
+            : false) ||
+       ...);
+  if (!found)
+    throw std::runtime_error{fmt::format(
+        "uniform block list needs to be updated with {} ({})", name, size)};
+
+  return outBinding;
 }
-} // namespace GL
+void Program::setupUniformBlocks() {
+  GLint numBlocks;
+  glGetProgramiv(ID, GL_ACTIVE_UNIFORM_BLOCKS, &numBlocks);
+
+  for (auto i = 0; i < numBlocks; i++) {
+    GLint length0;
+    glGetActiveUniformBlockiv(ID, i, GL_UNIFORM_BLOCK_NAME_LENGTH, &length0);
+    std::string name;
+    name.reserve(length0);
+    glGetActiveUniformBlockName(ID, i, length0, nullptr, name.data());
+
+    GLint dataSize;
+    glGetActiveUniformBlockiv(ID, i, GL_UNIFORM_BLOCK_DATA_SIZE, &dataSize);
+
+    {
+      using namespace shaders::uniforms;
+      const GLuint binding =
+          checkUniformBlockData<ProjectionBlock, CameraBlock, PhongData>(
+              name.c_str(), dataSize);
+      fmt::println("matching {} index {} with ubo binding {}", name.c_str(), i,
+                   binding);
+      glUniformBlockBinding(ID, i, binding);
+    }
+  }
+}
+} // namespace GL::test

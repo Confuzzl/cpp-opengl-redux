@@ -1,174 +1,232 @@
 #pragma once
 
-#define SET_UNIFORM_TEMPLATE(U, T, call)                                       \
-  template <>                                                                  \
-  inline void setUniform(const Program &p, const GL::Uniform<U> &uniform,      \
-                         const T value) {                                      \
-    call;                                                                      \
-  }
-#define SET_SCALAR(type, scalar_type)                                          \
-  SET_UNIFORM_TEMPLATE(                                                        \
-      type, type,                                                              \
-      glProgramUniform1##scalar_type(p.ID, uniform.location, value))
-#define SET_VECTOR(type, vector_type)                                          \
-  SET_UNIFORM_TEMPLATE(type, type,                                             \
-                       glProgramUniform##vector_type##v(                       \
-                           p.ID, uniform.location, 1, glm::value_ptr(value)))
-#define SET_MATRIX(type, matrix_type)                                          \
-  SET_UNIFORM_TEMPLATE(                                                        \
-      type, type,                                                              \
-      glProgramUniformMatrix##matrix_type##fv(                                 \
-          p.ID, uniform.location, 1, GL_FALSE, glm::value_ptr(value)))
+#include "glad/gl.h"
+#include <glm/gtc/type_ptr.hpp>
 
-#define SET_UNIFORM(func_name, param_t, param_name, shader, def)               \
-  auto &set##func_name(const param_t param_name def) {                         \
-    setUniform(*this, shader.param_name, param_name);                          \
-    return *this;                                                              \
-  }
-#define SET_UNIFORM_V(func_name, param_t, param_name, def)                     \
-  SET_UNIFORM(func_name, param_t, param_name, vertex, def)
-#define SET_UNIFORM_F(func_name, param_t, param_name, def)                     \
-  SET_UNIFORM(func_name, param_t, param_name, fragment, def)
-#define SET_UNIFORM_G(func_name, param_t, param_name, def)                     \
-  SET_UNIFORM(func_name, param_t, param_name, geometry, def)
-#define SET_UNIFORM_T(func_name, param_t, param_name, def)                     \
-  SET_UNIFORM(func_name, param_t, param_name, tessellation, def)
-
-#define BIND_TEXTURE(sampler, sampler_name)                                    \
-  auto &bindTexture##sampler(const GL::Texture &texture) {                     \
-    glBindTextureUnit(fragment.sampler_name.binding, texture.ID);              \
-    return *this;                                                              \
-  }
-
-#include <glad/gl.h>
-#include <glm/glm.hpp>
-
-#include "color.h"
-#include "gl/component/fragment.h"
-#include "gl/component/geometry.h"
-#include "gl/component/tessellation.h"
-#include "gl/component/vertex.h"
+#include "gl/components.h"
 #include "gl/gl_object.h"
-// #include "gl/uniform.h"
 #include "gl/texture.h"
 #include "gl/vao.h"
+#include "gl_util.h"
 #include "util.h"
 
-#include <initializer_list>
+#include <map>
+#include <string>
+#include <tuple>
 
-namespace GL {
-struct Shader {
-  GLuint ID;
+namespace GL::test {
+struct Shader : IDHolder {
   GLenum type;
   const char *name;
 
   Shader(const GLenum type, const char *const name);
   ~Shader();
-  MOVE_ONLY_TYPE(Shader)
+  DEFAULT_MOVE_ONLY_TYPE(Shader);
 };
 
-struct Program {
-  GLuint ID;
+struct Program : IDHolder {
+protected:
+  struct UniformData {
+    GLint location;
+    GLenum type;
+  };
+  std::map<std::string, UniformData, std::less<>> uniforms{};
+  std::map<std::string, GLuint, std::less<>> samplers{};
+  bool ignoreMissingUniforms = false;
 
-  Program(const std::initializer_list<Shader> shaders);
+  template <std::size_t N>
+  Program(const Shader (&shaders)[N]) : IDHolder(glCreateProgram()) {
+    if (!ID)
+      throw std::runtime_error{"FAILED TO CREATE PROGRAM"};
+
+    fmt::println("Program created: {}", ID);
+
+    for (const auto &shader : shaders) {
+      glAttachShader(ID, shader.ID);
+    }
+
+    linkProgram();
+    setupUniforms();
+    setupUniformBlocks();
+  }
+
+public:
   ~Program();
-  MOVE_ONLY_TYPE(Program)
-};
-template <typename U, typename T>
-void setUniform(const Program &p, const U &uniform, const T value);
-SET_SCALAR(bool, i)
-SET_SCALAR(int, i)
-SET_SCALAR(unsigned int, ui)
-SET_SCALAR(Color, ui)
-SET_SCALAR(float, f)
-SET_VECTOR(glm::vec2, 2f)
-SET_VECTOR(glm::vec3, 3f)
-SET_VECTOR(glm::uvec2, 2ui)
-SET_VECTOR(glm::uvec3, 3ui)
-template <>
-inline void setUniform(const Program &p, const GL::Uniform<glm::mat4> &uniform,
-                       const glm::mat4 value) {
-  glad_glProgramUniformMatrix4fv(p.ID, uniform.location, 1, 0,
-                                 glm::value_ptr(value));
-}
-} // namespace GL
+  DEFAULT_MOVE_ONLY_TYPE(Program);
 
-namespace shaders {
+private:
+  void linkProgram() const;
+  void setupUniforms();
+  void setupUniformBlocks();
+};
+} // namespace GL::test
+
+namespace shaders::test {
 namespace detail {
-template <typename V, typename F> struct BaseProgram : ::GL::Program {
+template <typename Derived> struct UniformProgram : ::GL::test::Program {
+  using ::GL::test::Program::Program;
+
+private:
+  template <auto func, typename T, typename... Args>
+  Derived &setUniformImpl(const std::string_view name, Args &&...args) {
+    static constexpr auto TYPE_MACRO = GL::uniformTypeMacro<T>;
+
+    const auto it = uniforms.find(name);
+    if (it != uniforms.end()) {
+      const auto [loc, type] = it->second;
+      if (type != TYPE_MACRO) {
+        throw std::runtime_error{
+            fmt::format("{} | uniform {} expected type {} but got {}", ID, name,
+                        GL::uniformTypeToString(type),
+                        GL::uniformTypeToString(TYPE_MACRO))};
+      }
+      (*func)(ID, loc, args...);
+    } else if (!ignoreMissingUniforms) {
+      throw std::runtime_error{
+          fmt::format("{} | {} was not a valid uniform name", ID, name)};
+    }
+    return static_cast<Derived &>(*this);
+  }
+
+  static constexpr decltype(&glProgramUniform1fv) UNIFORM_VECF_FPS[]{
+      &glProgramUniform1fv,
+      &glProgramUniform2fv,
+      &glProgramUniform3fv,
+      &glProgramUniform4fv,
+  };
+  static constexpr decltype(&glProgramUniform1iv) UNIFORM_VECI_FPS[]{
+      &glProgramUniform1iv,
+      &glProgramUniform2iv,
+      &glProgramUniform3iv,
+      &glProgramUniform4iv,
+  };
+  static constexpr decltype(&glProgramUniform1uiv) UNIFORM_VECU_FPS[]{
+      &glProgramUniform1uiv,
+      &glProgramUniform2uiv,
+      &glProgramUniform3uiv,
+      &glProgramUniform4uiv,
+  };
+
+public:
+  auto &bind(const std::string_view name, const GL::Texture &tex) {
+    const auto it = samplers.find(name);
+    if (it == samplers.end()) {
+      throw std::runtime_error{
+          fmt::format("{} | {} was not a valid sampler name", ID, name)};
+    }
+    glBindTextureUnit(it->second, tex.ID);
+    return static_cast<Derived &>(*this);
+  }
+
+  auto &set(const std::string_view name, const float value) {
+    return setUniformImpl<&glProgramUniform1f, float>(name, value);
+  }
+  auto &set(const std::string_view name, const int value) {
+    return setUniformImpl<&glProgramUniform1i, int>(name, value);
+  }
+  auto &set(const std::string_view name, const unsigned int value) {
+    return setUniformImpl<&glProgramUniform1ui, unsigned int>(name, value);
+  }
+
+  template <glm::length_t L>
+  auto &set(const std::string_view name, const glm::vec<L, float> value) {
+    return setUniformImpl<UNIFORM_VECF_FPS[L - 1], glm::vec<L, float>>(
+        name, 1, glm::value_ptr(value));
+  }
+  template <glm::length_t L>
+  auto &set(const std::string_view name, const glm::vec<L, int> value) {
+    return setUniformImpl<UNIFORM_VECI_FPS[L - 1], glm::vec<L, int>>(
+        name, 1, glm::value_ptr(value));
+  }
+  template <glm::length_t L>
+  auto &set(const std::string_view name,
+            const glm::vec<L, unsigned int> value) {
+    return setUniformImpl<UNIFORM_VECU_FPS[L - 1], glm::vec<L, unsigned int>>(
+        name, 1, glm::value_ptr(value));
+  }
+
+  auto &set(const std::string_view name, const glm::mat4 &value) {
+    return setUniformImpl<&glProgramUniformMatrix4fv, glm::mat4>(
+        name, 1, false, glm::value_ptr(value));
+  }
+};
+
+template <typename Derived, typename V, typename F>
+struct BaseProgram : UniformProgram<Derived> {
   using VertexType = typename V::LayoutType;
 
 protected:
   GL::VertexArrayObject<VertexType> vao;
-  V vertex;
-  F fragment;
 
-  BaseProgram(const std::initializer_list<GL::Shader> shaders)
-      : Program{shaders}, vertex{ID}, fragment{ID} {}
+  using UniformProgram<Derived>::UniformProgram;
 
-  void bind(const GL::VBO<VertexType> &vbo) const {
-    glUseProgram(ID);
+  void bindBO(const GL::VBO<VertexType> &vbo) const {
+    glUseProgram(::GL::test::Program::ID);
     glBindVertexArray(vao.ID);
     glVertexArrayVertexBuffer(vao.ID, 0, vbo.ID, 0,
                               GL::VBO<VertexType>::STRIDE);
   }
-  void bind(const GL::VBO<VertexType> &vbo, const GL::EBO &ebo) const {
-    bind(vbo);
+  void bindBO(const GL::VBO<VertexType> &vbo, const GL::EBO &ebo) const {
+    bindBO(vbo);
     glVertexArrayElementBuffer(vao.ID, ebo.ID);
   }
+
+  template <bool patch, GLint size, typename... BOs>
+  void genericDraw(const bool reset, const GLenum primitive,
+                   BOs &...bos) const {
+    bindBO(bos...);
+    GL::VBO<VertexType> &vbo = std::get<0>(std::tie(bos...));
+
+    if constexpr (patch)
+      glPatchParameteri(GL_PATCH_VERTICES, size);
+    if constexpr (sizeof...(BOs) == 1) {
+      glDrawArrays(primitive, 0, vbo.count);
+    } else {
+      const GL::EBO &ebo = std::get<1>(std::tie(bos...));
+      glDrawElements(primitive, ebo.count, ebo.type,
+                     reinterpret_cast<const void *>(0));
+    }
+    if (reset)
+      vbo.reset();
+  }
 };
-template <typename V, typename F> struct NoTesselationDraw : BaseProgram<V, F> {
-  using Base = BaseProgram<V, F>;
-  using Base::BaseProgram;
+template <typename V, typename F>
+struct NoTesselationDraw : BaseProgram<NoTesselationDraw<V, F>, V, F> {
+  using Base = BaseProgram<NoTesselationDraw<V, F>, V, F>;
+  // https://stackoverflow.com/questions/74643366
+  // https://stackoverflow.com/questions/25944000
+  // using Base::BaseProgram;
+  using BaseProgram<NoTesselationDraw<V, F>, V, F>::BaseProgram;
   using typename Base::VertexType;
 
   void draw(const GLenum primitive, GL::VBO<VertexType> &vbo,
             const bool reset = true) const {
-    Base::bind(vbo);
-    glDrawArrays(primitive, 0, vbo.count);
-    if (reset)
-      vbo.reset();
+    Base::template genericDraw<false, 0>(reset, primitive, vbo);
   }
   void draw(const GLenum primitive, GL::VBO<VertexType> &vbo,
             const GL::EBO &ebo, const bool reset = true) const {
-    Base::bind(vbo, ebo);
-    glDrawElements(primitive, ebo.count, ebo.type,
-                   reinterpret_cast<const void *>(0));
-    if (reset)
-      vbo.reset();
+    Base::template genericDraw<false, 0>(reset, primitive, vbo, ebo);
   }
 };
 template <typename V, typename T, typename F>
-struct YesTesselationDraw : BaseProgram<V, F> {
-  using BaseProgram<V, F>::BaseProgram;
-
-  using Base = BaseProgram<V, F>;
+struct YesTesselationDraw : BaseProgram<YesTesselationDraw<V, T, F>, V, F> {
+  using Base = BaseProgram<YesTesselationDraw<V, T, F>, V, F>;
+  // using Base::BaseProgram;
+  using BaseProgram<YesTesselationDraw<V, T, F>, V, F>::BaseProgram;
   using typename Base::VertexType;
 
   static constexpr auto PATCH_SIZE = T::PATCH_SIZE;
 
   void draw(GL::VBO<VertexType> &vbo, const bool reset = true) const {
-    Base::bind(vbo);
-    glPatchParameteri(GL_PATCH_VERTICES, PATCH_SIZE);
-    glDrawArrays(GL_PATCHES, 0, vbo.count);
-    if (reset)
-      vbo.reset();
+    Base::template genericDraw<true, PATCH_SIZE>(reset, GL_PATCHES, vbo);
   }
   void draw(GL::VBO<VertexType> &vbo, const GL::EBO &ebo,
             const bool reset = true) const {
-    Base::bind(vbo, ebo);
-    glPatchParameteri(GL_PATCH_VERTICES, PATCH_SIZE);
-    glDrawElements(GL_PATCHES, ebo.count, ebo.type,
-                   reinterpret_cast<const void *>(0));
-    if (reset)
-      vbo.reset();
+    Base::template genericDraw<true, PATCH_SIZE>(reset, GL_PATCHES, vbo, ebo);
   }
 };
 template <typename V, typename G, typename T, typename F>
 struct GenericProgram : YesTesselationDraw<V, T, F> {
-  T tessellation;
-  G geometry;
-
   GenericProgram()
       : YesTesselationDraw<V, T, F>({
             {GL_VERTEX_SHADER, V::name},
@@ -180,26 +238,22 @@ struct GenericProgram : YesTesselationDraw<V, T, F> {
 };
 template <typename V, typename F, typename T>
 struct GenericProgram<V, void, T, F> : YesTesselationDraw<V, T, F> {
-  T tessellation;
   GenericProgram()
       : YesTesselationDraw<V, T, F>({
             {GL_VERTEX_SHADER, V::name},
             {GL_FRAGMENT_SHADER, F::name},
             {GL_TESS_CONTROL_SHADER, T::controlName},
             {GL_TESS_EVALUATION_SHADER, T::evalName},
-        }),
-        tessellation{::GL::Program::ID} {}
+        }) {}
 };
 template <typename V, typename G, typename F>
 struct GenericProgram<V, G, void, F> : NoTesselationDraw<V, F> {
-  G geometry;
   GenericProgram()
       : NoTesselationDraw<V, F>({
             {GL_VERTEX_SHADER, V::name},
             {GL_FRAGMENT_SHADER, F::name},
             {GL_GEOMETRY_SHADER, G::name},
-        }),
-        geometry{::GL::Program::ID} {}
+        }) {}
 };
 template <typename V, typename F>
 struct GenericProgram<V, void, void, F> : NoTesselationDraw<V, F> {
@@ -211,106 +265,23 @@ struct GenericProgram<V, void, void, F> : NoTesselationDraw<V, F> {
 };
 } // namespace detail
 
-struct Basic : detail::GenericProgram<vert::Basic, void, void, frag::Basic> {
-  SET_UNIFORM_V(Model, glm::mat4 &, model, )
-  SET_UNIFORM_F(FragColor, Color, frag_color, )
-};
-struct Texcol : detail::GenericProgram<vert::Tex, void, void, frag::Texcol> {
-  SET_UNIFORM_V(Model, glm::mat4 &, model, )
-  BIND_TEXTURE(Sampler, sampler);
-  SET_UNIFORM_F(FragColor, Color, frag_color, )
-};
-struct Texcol2 : detail::GenericProgram<vert::Tex2, void, void, frag::Texcol> {
-  SET_UNIFORM_V(Model, glm::mat4 &, model, )
-  BIND_TEXTURE(Sampler, sampler);
-  SET_UNIFORM_F(FragColor, Color, frag_color, )
-};
-
-struct Flat : detail::GenericProgram<vert::Normal, void, void, frag::Flat> {
-  SET_UNIFORM_V(Model, glm::mat4 &, model, )
-  SET_UNIFORM_F(Light, glm::vec3, light, )
-  SET_UNIFORM_F(LightColor, Color, light_color, )
-  SET_UNIFORM_F(FragColor, Color, frag_color, )
-};
-struct Normal : detail::GenericProgram<vert::Normal, void, void, frag::Normal> {
-  SET_UNIFORM_V(Model, glm::mat4 &, model, )
-};
-struct Phong : detail::GenericProgram<vert::Normal, void, void, frag::Phong> {
-  SET_UNIFORM_V(Model, glm::mat4 &, model, )
-  SET_UNIFORM_F(Light, glm::vec3, light, )
-  SET_UNIFORM_F(LightColor, Color, light_color, )
-  SET_UNIFORM_F(CameraPos, glm::vec3, camera_pos, )
-  SET_UNIFORM_F(FragColor, Color, frag_color, )
-};
-struct Phong2
-    : detail::GenericProgram<vert::Texnorm, void, void, frag::Phong2> {
-  SET_UNIFORM_V(Model, glm::mat4 &, model, )
-  BIND_TEXTURE(Sampler, sampler);
-  SET_UNIFORM_F(CameraPos, glm::vec3, camera_pos, )
-};
-struct Sphere
-    : detail::GenericProgram<vert::Sphere, void, tess::Sphere, frag::Phong> {
-  SET_UNIFORM_T(Model, glm::mat4 &, model, )
-  SET_UNIFORM_F(Light, glm::vec3, light, )
-  SET_UNIFORM_F(LightColor, Color, light_color, )
-  SET_UNIFORM_F(CameraPos, glm::vec3, camera_pos, )
-  SET_UNIFORM_F(FragColor, Color, frag_color, )
-};
-struct Cylinder : detail::GenericProgram<vert::Cylinder, void, tess::Cylinder,
-                                         frag::Phong> {
-  SET_UNIFORM_T(Model, glm::mat4 &, model, )
-  SET_UNIFORM_F(Light, glm::vec3, light, )
-  SET_UNIFORM_F(LightColor, Color, light_color, )
-  SET_UNIFORM_F(CameraPos, glm::vec3, camera_pos, )
-  SET_UNIFORM_F(FragColor, Color, frag_color, )
-};
-struct Cone
-    : detail::GenericProgram<vert::Cone, void, tess::Cone, frag::Phong> {
-  SET_UNIFORM_T(Model, glm::mat4 &, model, )
-  SET_UNIFORM_F(Light, glm::vec3, light, )
-  SET_UNIFORM_F(LightColor, Color, light_color, )
-  SET_UNIFORM_F(CameraPos, glm::vec3, camera_pos, )
-  SET_UNIFORM_F(FragColor, Color, frag_color, )
-};
-struct Torus
-    : detail::GenericProgram<vert::Torus, void, tess::Torus, frag::Phong> {
-  SET_UNIFORM_T(Resolution, float, resolution, )
-  SET_UNIFORM_T(Model, glm::mat4 &, model, )
-  SET_UNIFORM_F(Light, glm::vec3, light, )
-  SET_UNIFORM_F(LightColor, Color, light_color, )
-  SET_UNIFORM_F(CameraPos, glm::vec3, camera_pos, )
-  SET_UNIFORM_F(FragColor, Color, frag_color, )
-};
-
-struct Superquadric : detail::GenericProgram<vert::Superquadric, void,
-                                             tess::Superquadric, frag::Phong> {
-  SET_UNIFORM_T(Model, glm::mat4 &, model, )
-  SET_UNIFORM_F(Light, glm::vec3, light, )
-  SET_UNIFORM_F(LightColor, Color, light_color, )
-  SET_UNIFORM_F(CameraPos, glm::vec3, camera_pos, )
-  SET_UNIFORM_F(FragColor, Color, frag_color, )
-};
-struct NormalMap
-    : detail::GenericProgram<vert::NormalMap, void, void, frag::NormalMap> {
-  SET_UNIFORM_V(Model, glm::mat4 &, model, )
-  BIND_TEXTURE(DiffuseMap, diffuse_map);
-  BIND_TEXTURE(NormalMap, normal_map);
-  SET_UNIFORM_F(Light, glm::vec3, light, )
-  SET_UNIFORM_F(CameraPos, glm::vec3, camera_pos, )
-};
-struct Align : detail::GenericProgram<vert::Align, void, void, frag::Basic> {
-  SET_UNIFORM_V(Model, glm::mat4 &, model, )
-  SET_UNIFORM_F(FragColor, Color, frag_color, )
-};
-} // namespace shaders
-
-#undef SET_UNIFORM_TEMPLATE
-#undef SET_SCALAR
-#undef SET_VECTOR_2
-#undef SET_VECTOR
-#undef SET_MATRIX
-#undef SET_UNIFORM
-#undef SET_UNIFORM_V
-#undef SET_UNIFORM_F
-#undef SET_UNIFORM_G
-#undef BIND_TEXTURE
+using Basic = detail::GenericProgram<vert::Basic, void, void, frag::Basic>;
+using Texcol = detail::GenericProgram<vert::Tex, void, void, frag::Texcol>;
+using Texcol2 = detail::GenericProgram<vert::Tex2, void, void, frag::Texcol>;
+using Flat = detail::GenericProgram<vert::Normal, void, void, frag::Flat>;
+using Normal = detail::GenericProgram<vert::Normal, void, void, frag::Normal>;
+using Phong = detail::GenericProgram<vert::Normal, void, void, frag::Phong>;
+using Phong2 = detail::GenericProgram<vert::Texnorm, void, void, frag::Phong2>;
+using Sphere =
+    detail::GenericProgram<vert::Sphere, void, tess::Sphere, frag::Phong>;
+using Cylinder =
+    detail::GenericProgram<vert::Cylinder, void, tess::Cylinder, frag::Phong>;
+using Cone = detail::GenericProgram<vert::Cone, void, tess::Cone, frag::Phong>;
+using Torus =
+    detail::GenericProgram<vert::Torus, void, tess::Torus, frag::Phong>;
+using Superquadric = detail::GenericProgram<vert::Superquadric, void,
+                                            tess::Superquadric, frag::Phong>;
+using NormalMap =
+    detail::GenericProgram<vert::NormalMap, void, void, frag::NormalMap>;
+using Align = detail::GenericProgram<vert::Align, void, void, frag::Basic>;
+} // namespace shaders::test

@@ -5,6 +5,7 @@
 #include <imgui_impl_opengl3.h>
 
 #include "app/app.h"
+#include "gl/uniform.h"
 
 void BaseRenderer::render(const float dt) {
   renderImpl(dt);
@@ -53,8 +54,8 @@ void BaseRenderer::renderSidebarPostlude() const {
 }
 void BaseRenderer::renderImpl([[maybe_unused]] const float dt) const {
   {
-    using namespace shaders;
-    getUBO<uniforms::CameraBlock>().update(world->cam.matrix());
+    using namespace shaders::uniforms;
+    shared<CameraBlock>().update(world->cam.matrix());
   }
 
   static const auto &LIGHT_TEXTURE =
@@ -80,9 +81,9 @@ void BaseRenderer::renderImpl([[maybe_unused]] const float dt) const {
   billboard[3] = {world->light, 1.0};
 
   app()
-      .shaders.texcol2.bindTextureSampler(LIGHT_TEXTURE)
-      .setModel(billboard)
-      .setFragColor(world->lightColor)
+      .shaders.texcol2.bind("sampler", LIGHT_TEXTURE)
+      .set("model", billboard)
+      .set("frag_color", world->lightColor)
       .draw(GL_TRIANGLES, LIGHT, EBO);
 
   static auto AXIS = GL::VBO<>{2};
@@ -93,7 +94,9 @@ void BaseRenderer::renderImpl([[maybe_unused]] const float dt) const {
       p[i] = 10;
       AXIS.write({{}});
       AXIS.write({p});
-      app().shaders.basic.setModel({1.0f}).setFragColor(COLORS[i]).draw(
-          GL_LINES, AXIS);
+      app()
+          .shaders.basic.set("model", glm::mat4{1.0f})
+          .set("frag_color", COLORS[i])
+          .draw(GL_LINES, AXIS);
     }
 }

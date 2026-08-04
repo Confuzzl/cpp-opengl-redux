@@ -2,7 +2,7 @@
 
 namespace GL {
 BufferObject::BufferObject(const GLsizeiptr size, const GLbitfield flags,
-                           const void *data)
+                           const void *const data)
     : size{size} {
   glCreateBuffers(1, &ID);
   glNamedBufferStorage(ID, size, data, flags);

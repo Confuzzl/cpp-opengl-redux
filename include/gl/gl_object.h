@@ -15,7 +15,7 @@ struct BufferObject {
   GLsizei count = 0;
 
   BufferObject(const GLsizeiptr size, const GLbitfield flags,
-               const void *data = nullptr);
+               const void *const data = nullptr);
   ~BufferObject();
 
   void reset() { count = 0; }
@@ -42,7 +42,6 @@ template <typename V = vert_lay::pos> struct VBO : BufferObject {
 
     const GLsizei newSize = newCount * STRIDE;
     if (newSize > size) {
-      // print_info("RESIZING!");
       fmt::println("COUNTS {} -> {}", oldCount, newCount);
       fmt::println("RESIZING {} -> {}", size, newSize * 2);
       GLuint bigger;
@@ -68,26 +67,6 @@ template <typename V = vert_lay::pos> struct VBO : BufferObject {
       count = 0;
 
     addCount(std::size(list), std::data(list));
-    // const auto lsize = std::size(list);
-    // const GLsizei oldCount = count;
-    // const GLsizei newCount = count + lsize;
-
-    // const GLsizei newSize = newCount * STRIDE;
-    // if (newSize > size) {
-    //   fmt::println("COUNTS {} -> {}", oldCount, newCount);
-    //   fmt::println("RESIZING {} -> {}", size, newSize * 2);
-    //   GLuint bigger;
-    //   glCreateBuffers(1, &bigger);
-    //   glNamedBufferStorage(bigger, newSize * 2, nullptr,
-    //                        GL_DYNAMIC_STORAGE_BIT);
-    //   glCopyNamedBufferSubData(ID, bigger, 0, 0, size);
-    //   glDeleteBuffers(1, &ID);
-    //   ID = bigger;
-    //   size = newSize * 2;
-    // }
-    // glNamedBufferSubData(ID, oldCount * STRIDE, lsize * STRIDE,
-    //                      std::data(list));
-    // count = newCount;
   }
 };
 struct EBO : BufferObject {

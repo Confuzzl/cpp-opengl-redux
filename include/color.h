@@ -36,6 +36,8 @@ struct Color {
     return r << 24 | g << 16 | b << 8 | a;
   }
 
+  template <typename T> T as() const { return static_cast<T>(*this); }
+
   // Color &setRed(const unsigned char r) {
   //   this->r = r;
   //   return *this;

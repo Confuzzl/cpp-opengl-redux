@@ -1,48 +1,18 @@
 #pragma once
 
-#include "gl/component/uniform_macros.h"
-
-#define TESS_BEGIN(tname, psize, cname, ename)                                 \
-  struct tname : UniformHolder {                                               \
+#define NEW_TESS(tname, psize, cname, ename)                                   \
+  struct tname {                                                               \
     static constexpr unsigned int PATCH_SIZE = psize;                          \
     static constexpr char controlName[] = cname;                               \
-    static constexpr char evalName[] = ename
-#define TESS_END                                                               \
-  using UniformHolder::UniformHolder;                                          \
+    static constexpr char evalName[] = ename;                                  \
   }
 
 namespace shaders::tess {
-TESS_BEGIN(Sphere, 1, "sphere.tesc", "sphere.tese");
-NEW_UNIFORM_BLOCK(ProjectionBlock);
-NEW_UNIFORM_BLOCK(CameraBlock);
-NEW_UNIFORM(glm::mat4, model);
-TESS_END;
-
-TESS_BEGIN(Cylinder, 1, "cylinder.tesc", "cylinder.tese");
-NEW_UNIFORM_BLOCK(ProjectionBlock);
-NEW_UNIFORM_BLOCK(CameraBlock);
-NEW_UNIFORM(glm::mat4, model);
-TESS_END;
-
-TESS_BEGIN(Cone, 1, "cone.tesc", "cone.tese");
-NEW_UNIFORM_BLOCK(ProjectionBlock);
-NEW_UNIFORM_BLOCK(CameraBlock);
-NEW_UNIFORM(glm::mat4, model);
-TESS_END;
-
-TESS_BEGIN(Torus, 1, "torus.tesc", "torus.tese");
-NEW_UNIFORM(float, resolution);
-NEW_UNIFORM_BLOCK(ProjectionBlock);
-NEW_UNIFORM_BLOCK(CameraBlock);
-NEW_UNIFORM(glm::mat4, model);
-TESS_END;
-
-TESS_BEGIN(Superquadric, 1, "superquadric.tesc", "superquadric.tese");
-NEW_UNIFORM_BLOCK(ProjectionBlock);
-NEW_UNIFORM_BLOCK(CameraBlock);
-NEW_UNIFORM(glm::mat4, model);
-TESS_END;
+NEW_TESS(Sphere, 1, "sphere.tesc", "sphere.tese");
+NEW_TESS(Cylinder, 1, "cylinder.tesc", "cylinder.tese");
+NEW_TESS(Cone, 1, "cone.tesc", "cone.tese");
+NEW_TESS(Torus, 1, "torus.tesc", "torus.tese");
+NEW_TESS(Superquadric, 1, "superquadric.tesc", "superquadric.tese");
 } // namespace shaders::tess
 
-#undef TESS_BEGIN
-#undef TESS_END
+#undef NEW_TESS

@@ -1,87 +1,26 @@
 #pragma once
 
-#include "gl/uniform.h"
-
-#include "gl/component/uniform_macros.h"
 #include "gl/vertex_layout.h"
 
-#define VERT_BEGIN(tname, layout, sname)                                       \
-  struct tname : Base<layout> {                                                \
-    static constexpr char name[] = sname
-#define VERT_END                                                               \
-  using Base::Base;                                                            \
+#define NEW_VERT(tname, layout, sname)                                         \
+  struct tname {                                                               \
+    static constexpr char name[] = sname;                                      \
+    using LayoutType = layout;                                                 \
   }
 
 namespace shaders::vert {
-template <typename VertexLayout> struct Base : UniformHolder {
-  using LayoutType = VertexLayout;
-
-  using UniformHolder::UniformHolder;
-};
-
-VERT_BEGIN(Basic, vertex_layout::pos, "basic.vert");
-NEW_UNIFORM_BLOCK(ProjectionBlock);
-NEW_UNIFORM_BLOCK(CameraBlock);
-NEW_UNIFORM(glm::mat4, model);
-VERT_END;
-
-VERT_BEGIN(Sphere, vertex_layout::sphere, "sphere.vert");
-VERT_END;
-
-VERT_BEGIN(Cylinder, vertex_layout::cylinder, "cylinder.vert");
-VERT_END;
-
-VERT_BEGIN(Cone, vertex_layout::cone, "cone.vert");
-VERT_END;
-
-VERT_BEGIN(Torus, vertex_layout::torus, "torus.vert");
-VERT_END;
-
-VERT_BEGIN(Superquadric, vertex_layout::superquadric, "superquadric.vert");
-VERT_END;
-
-VERT_BEGIN(Normal, vertex_layout::posnorm, "normal.vert");
-NEW_UNIFORM_BLOCK(ProjectionBlock);
-NEW_UNIFORM_BLOCK(CameraBlock);
-NEW_UNIFORM(glm::mat4, model);
-VERT_END;
-
-VERT_BEGIN(Tex, vertex_layout::postex, "tex.vert");
-NEW_UNIFORM_BLOCK(ProjectionBlock);
-NEW_UNIFORM_BLOCK(CameraBlock);
-NEW_UNIFORM(glm::mat4, model);
-VERT_END;
-
-VERT_BEGIN(Tex2, vertex_layout::postex2, "tex.vert");
-NEW_UNIFORM_BLOCK(ProjectionBlock);
-NEW_UNIFORM_BLOCK(CameraBlock);
-NEW_UNIFORM(glm::mat4, model);
-VERT_END;
-
-VERT_BEGIN(Texnorm, vertex_layout::postexnorm, "texnorm.vert");
-NEW_UNIFORM_BLOCK(ProjectionBlock);
-NEW_UNIFORM_BLOCK(CameraBlock);
-NEW_UNIFORM(glm::mat4, model);
-VERT_END;
-
-VERT_BEGIN(NormalMap, vertex_layout::normalmap, "normal_map.vert");
-NEW_UNIFORM_BLOCK(ProjectionBlock);
-NEW_UNIFORM_BLOCK(CameraBlock);
-NEW_UNIFORM(glm::mat4, model);
-VERT_END;
-
-VERT_BEGIN(Align, vertex_layout::align, "align.vert");
-NEW_UNIFORM_BLOCK(ProjectionBlock);
-NEW_UNIFORM_BLOCK(CameraBlock);
-NEW_UNIFORM(glm::mat4, model);
-VERT_END;
-
-// VERT_BEGIN(Normal2, vertex_layout::posnorm2, "normal.vert");
-// NEW_UNIFORM_BLOCK(ProjectionBlock);
-// NEW_UNIFORM_BLOCK(CameraBlock);
-// NEW_UNIFORM(glm::mat4, model);
-// VERT_END;
+NEW_VERT(Basic, vert_lay::pos, "basic.vert");
+NEW_VERT(Sphere, vert_lay::sphere, "sphere.vert");
+NEW_VERT(Cylinder, vert_lay::cylinder, "cylinder.vert");
+NEW_VERT(Cone, vert_lay::cone, "cone.vert");
+NEW_VERT(Torus, vert_lay::torus, "torus.vert");
+NEW_VERT(Superquadric, vert_lay::superquadric, "superquadric.vert");
+NEW_VERT(Normal, vert_lay::posnorm, "normal.vert");
+NEW_VERT(Tex, vert_lay::postex, "tex.vert");
+NEW_VERT(Tex2, vert_lay::postex2, "tex.vert");
+NEW_VERT(Texnorm, vert_lay::postexnorm, "texnorm.vert");
+NEW_VERT(NormalMap, vert_lay::normalmap, "normal_map.vert");
+NEW_VERT(Align, vert_lay::align, "align.vert");
 } // namespace shaders::vert
 
-#undef VERT_BEGIN
-#undef VERT_END
+#undef NEW_VERT
